@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
-import { portProblem } from '../server/src/safety.js';
+import { allowedExtraHosts, portProblem } from '../server/src/safety.js';
 
 // Every published port must be bound to loopback on the host. A small line parser (no YAML dependency).
 export function publishedPorts(text) {
@@ -79,4 +79,10 @@ test('compose never mounts the Docker socket and passes no log-reader settings',
   const compose = here('docker-compose.yml');
   assert.doesNotMatch(compose, /docker\.sock/);
   assert.doesNotMatch(compose, /RUN_OBS_/);
+});
+
+test('LAB_ALLOWED_HOSTS defaults to the lab-proxy names (otherwise the Host check answers 421 behind the proxy), every one a valid host name', () => {
+  const def = /LAB_ALLOWED_HOSTS: \$\{LAB_ALLOWED_HOSTS:-([^}]*)\}/.exec(here('docker-compose.yml'))[1].split(',').filter(Boolean);
+  assert.ok(def.includes('local.ping-devops.com') && def.includes('privilege-bedrock-assume-role-lab.local.ping-devops.com'));
+  assert.equal(allowedExtraHosts({ LAB_ALLOWED_HOSTS: def.join(',') }).size, 2);
 });

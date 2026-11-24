@@ -14,7 +14,7 @@ services:
     environment:
       PORT: "7838"
       PBA_BIND: 0.0.0.0
-      LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-}
+      LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-local.ping-devops.com,privilege-bedrock-assume-role-lab.local.ping-devops.com}
       CUSTOMER_CONFIG: ${CUSTOMER_CONFIG:-}
     # volumes:
     #   - ./customer.config.json:/config/customer.config.json:ro
