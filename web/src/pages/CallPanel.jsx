@@ -23,7 +23,7 @@ export default function CallPanel({ lab, live, trust, permission, onCalled }) {
     setError(null);
     try { window.history.replaceState(null, "", "#assumed-role"); } catch { /* ignore */ }
     const r = await lab.runCall({ prompt, providerState: state, aws: { trust, permission }, ...(advanceMs ? { advanceMs } : {}) });
-    if (!r.ok) setError(r.message); else { setAdvance("0"); onCalled(r.state); }
+    if (!r.ok) setError(r.message); else if (!r.stale) { setAdvance("0"); onCalled(r.state); }
   };
 
   return (

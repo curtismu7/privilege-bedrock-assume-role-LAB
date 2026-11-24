@@ -54,7 +54,7 @@ export function callExchanges(c, { prompt, startStep = 1, label = null }) {
       step: n++, title: `Gateway to the role service: ${ok ? 'role assumed' : `refused (${auth.result})`}`, status: ok ? 200 : 403,
       trace: mockTrace({
         url: STS_URL, authorization: 'Gateway identity (a lab mock value, not a credential)', requestHeaders: { accept: null },
-        rpc: { Action: 'AssumeRole', RoleArn: auth.roleArn, RoleSessionName: 'example-gateway-session', ExternalId: 'sent by the key (value not shown)' }, status: ok ? 200 : 403,
+        rpc: { Action: 'AssumeRole', RoleArn: auth.roleArn, RoleSessionName: 'example-gateway-session', ExternalId: auth.externalIdSent ? 'sent by the key (value not shown)' : 'none sent' }, status: ok ? 200 : 403,
         body: ok ? { Session: { assumedAt: auth.session.assumedAt, expiresAt: auth.session.expiresAt }, Credentials: '(short-lived lab mock values, never shown)', note: 'Lab model: the session length is UNVERIFIED.' }
           : { error: 'AccessDenied', result: auth.result, note: 'Lab model: the real status and wording are UNVERIFIED.' },
         decisions: [{ id: 'assume-role', label: ok ? 'The role was assumed' : 'The role was not assumed', outcome: ok ? 'pass' : 'fail', evidence: ok ? `Action ${auth.sessionAction}; trust policy, external ID and session checked by the lab's mock IAM.` : `${verdictFor(auth.result).title}: ${verdictFor(auth.result).message}` }],

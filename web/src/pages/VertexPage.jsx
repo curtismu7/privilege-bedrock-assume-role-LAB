@@ -6,7 +6,7 @@ import { EvalResult, PolicyBox } from "./PolicyPanel.jsx";
 import Result from "./Result.jsx";
 import ScenarioPicker from "./ScenarioPicker.jsx";
 import Snippets from "./Snippets.jsx";
-import { scenarioFromHash } from "./AssumedRolePage.jsx";
+import useScenarioHash from "../hooks/useScenarioHash";
 import { visible } from "../safeText";
 
 export const PAGE = "vertex";
@@ -37,13 +37,10 @@ export default function VertexPage({ lab }) {
   }, [lab]);
   const pick = (s) => { if (s.kind !== "vertex") window.location.hash = `#assumed-role/${s.id}`; else runScenario(s.id); };
 
-  useEffect(() => {
-    const id = scenarioFromHash(PAGE);
-    const sc = scenarios.find((s) => s.id === id);
-    if (!sc) return;
-    if (sc.kind !== "vertex") window.location.hash = `#assumed-role/${id}`;
-    else if (lab.last?.id !== id) runScenario(id);
-  }, [scenarios.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useScenarioHash(PAGE, scenarios, (sc) => {
+    if (sc.kind !== "vertex") window.location.hash = `#assumed-role/${sc.id}`;
+    else if (!(lab.last?.id === sc.id && lab.last.page === PAGE)) runScenario(sc.id);
+  });
 
   const evaluate = async () => {
     setBusy(true); setError(null);

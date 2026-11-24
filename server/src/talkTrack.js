@@ -26,8 +26,12 @@ export function parseTalkTrack(markdown) {
   return sections.map((s) => ({ ...s, say: s.paragraphs.join('\n\n') }));
 }
 
+// A missing or unreadable talk track is never silent: it is logged here (code only, never the path's contents) and GET /api/story says so; the doctor fails.
 export function loadTalkTrack(file = TALK_TRACK_FILE) {
-  try { return parseTalkTrack(fs.readFileSync(file, 'utf8')); } catch { return []; }
+  try { return parseTalkTrack(fs.readFileSync(file, 'utf8')); } catch (e) {
+    console.error(`[talk-track] docs/talk-track.md could not be read (${e?.code || 'error'}); the talk track is empty`);
+    return [];
+  }
 }
 
 export const buildTalkTrack = (cast, sections = loadTalkTrack()) => fillDeep(sections, cast);

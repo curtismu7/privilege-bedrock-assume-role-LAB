@@ -74,3 +74,11 @@ test('the API returns the trace and the verdict with a call and a scenario', asy
     assert.equal((await lab.send('POST', '/api/scenario/success', {})).json.verdict.title, 'Role assumed, call allowed');
   } finally { await lab.close(); }
 });
+
+test('the role-service step says whether the key sent an external ID: sent (value never shown) when it did, "none sent" when it did not', () => {
+  const stsBody = (id) => { const ex = exchangesOf(SCENARIOS.find((s) => s.id === id)).ex; return ex.find((e) => /role service/.test(e.title)).trace.request.body; };
+  assert.equal(stsBody('external-id-missing').ExternalId, 'none sent');
+  assert.equal(stsBody('success').ExternalId, 'sent by the key (value not shown)');
+  assert.equal(stsBody('external-id-mismatch').ExternalId, 'sent by the key (value not shown)');
+  assert.doesNotMatch(JSON.stringify(exchangesOf(SCENARIOS.find((s) => s.id === 'external-id-mismatch')).ex), /example-external-id-000\d/);
+});

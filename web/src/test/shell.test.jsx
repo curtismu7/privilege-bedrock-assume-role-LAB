@@ -6,7 +6,7 @@ import { VERTICALS } from "../../../server/src/cast.js";
 import { jsonResponse } from "./harness.js";
 import { nav, screen, text, useLabHarness, waitFor, within } from "./util.jsx";
 import { isPresenterKey } from "../App.jsx";
-import { WORKSPACE_ID } from "../workspace.js";
+import { WORKSPACE_ID, fillRandom } from "../workspace.js";
 import { dialogItems } from "../talk.js";
 
 const h = useLabHarness();
@@ -43,14 +43,6 @@ describe("shell: banner, mode toggle, presenter, talk track, reset", () => {
     await waitFor(() => expect(screen.getByTestId("mode-error-banner")).toHaveTextContent(/not built yet/));
     expect(text("mode")).toBe("Mock");
     expect(h.lab.calls.filter((c) => c.path === "/api/mode" && c.method === "POST").map((c) => c.body)).toEqual([{ source: "real" }]);
-  });
-
-  it("Mock switches back and all data is loaded again", async () => {
-    const user = await h.mount();
-    const before = h.lab.calls.filter((c) => c.path === "/api/info").length;
-    await user.click(screen.getByTestId("mode-mock"));
-    await waitFor(() => expect(h.lab.calls.filter((c) => c.path === "/api/info").length).toBeGreaterThan(before));
-    expect(h.lab.calls.some((c) => c.path === "/api/mode" && c.body?.source === "mock")).toBe(true);
   });
 
   it("names a server that is down instead of a blank page, and offers a retry", async () => {
@@ -139,6 +131,14 @@ describe("shell: banner, mode toggle, presenter, talk track, reset", () => {
     expect(document.querySelectorAll("h1")).toHaveLength(1);
   });
 
+  it("the random fallback fills the array in place (a typed array's map() would leave it zero), so ids differ", () => {
+    const a = fillRandom(new Uint8Array(8), undefined); const b = fillRandom(new Uint8Array(8), {});
+    expect([...a].some((n) => n !== 0)).toBe(true);
+    expect(a).not.toEqual(b);
+    const real = fillRandom(new Uint8Array(8), { getRandomValues: (x) => { x.fill(7); return x; } });
+    expect([...real]).toEqual(Array(8).fill(7));
+  });
+
   it("the client's workspace-id pattern is the server's", () => {
     expect(WORKSPACE_ID.source).toBe("^[a-z0-9][a-z0-9-]{0,31}$");
     for (const ok of ["w-0123456789abcdef", "a", "0"]) expect(WORKSPACE_ID.test(ok), ok).toBe(true);
@@ -155,5 +155,66 @@ describe("the configured customer reaches the first load", () => {
     expect(text("stories-for")).toContain("Test Brand Co");
     expect(screen.getByTestId("vertical-select")).toHaveValue("health");
     expect(VERTICALS.health.cast.castBrand).not.toBe("Test Brand Co");
+  });
+});
+
+describe("a run in flight, a mode press that changes nothing, a deliberate hash change", () => {
+  const slow = (ms) => async (init, u, go) => { await new Promise((r) => setTimeout(r, ms)); return go(); };
+
+  it("pressing the active Mock button changes nothing: no request, no reload", async () => {
+    const user = await h.mount();
+    const before = h.lab.calls.length;
+    await user.click(screen.getByTestId("mode-mock"));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(h.lab.calls.length).toBe(before);
+    expect(h.lab.calls.some((c) => c.path === "/api/mode")).toBe(false);
+  });
+
+  it("a result that arrives after the visitor changed the vertical is dropped; the address loses the scenario", async () => {
+    const user = await h.mount({ overrides: { "/api/scenario/success": slow(400) } });
+    await user.click(await screen.findByTestId("scenario-success"));
+    expect(window.location.hash).toBe("#assumed-role/success");
+    await user.selectOptions(screen.getByTestId("vertical-select"), "finance");
+    expect(window.location.hash).toBe("#assumed-role");
+    await new Promise((r) => setTimeout(r, 700));
+    expect(screen.queryByTestId("verdict")).toBeNull();
+    await screen.findByTestId("result-empty");
+  });
+
+  it("Reset while a run is in flight says so and does nothing (the shared menu cannot disable its button); afterwards it works", async () => {
+    const user = await h.mount({ overrides: { "/api/scenario/success": slow(400) } });
+    await user.click(await screen.findByTestId("scenario-success"));
+    await user.click(screen.getByTestId("reset"));
+    expect(screen.getByTestId("reset-note")).toHaveTextContent(/A run is in progress/);
+    expect(h.lab.calls.some((c) => c.path === "/api/reset")).toBe(false);
+    await screen.findByTestId("verdict");
+    await user.click(screen.getByTestId("reset"));
+    await screen.findByTestId("result-empty");
+    expect(h.lab.calls.some((c) => c.path === "/api/reset")).toBe(true);
+  });
+
+  it("a mode switch clears the scenario from the address too", async () => {
+    const user = await h.mount({ overrides: { "/api/info": async (_i, _u, go) => { const r = await go(); return jsonResponse(200, { ...(await r.json()), realAvailable: true }); } } });
+    await user.click(await screen.findByTestId("scenario-success"));
+    await screen.findByTestId("verdict");
+    await user.click(screen.getByTestId("mode-real"));
+    await waitFor(() => expect(window.location.hash).toBe("#assumed-role"));
+  });
+
+  it("an address that changes to a scenario runs it (a link while the page is open); the page's own buttons never run it twice", async () => {
+    const user = await h.mount();
+    await screen.findByTestId("scenario-success");
+    window.location.hash = "#assumed-role/external-id-missing";
+    await waitFor(() => expect(text("verdict-code")).toBe("external_id_missing"));
+    await user.click(screen.getByTestId("scenario-wrong-trust-principal"));
+    await waitFor(() => expect(text("verdict-code")).toBe("trust_principal_mismatch"));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(h.lab.calls.filter((c) => c.path === "/api/scenario/external-id-missing")).toHaveLength(1);
+    expect(h.lab.calls.filter((c) => c.path === "/api/scenario/wrong-trust-principal")).toHaveLength(1);
+  });
+
+  it("the Limits page shows customer.config warnings; the Stories page names a missing talk track", async () => {
+    await h.mount({ page: "limits", customer: validateConfig({ name: "<b>", vertical: "mining" }) });
+    expect(await screen.findByTestId("limits-config-warnings")).toHaveTextContent(/name:/);
   });
 });

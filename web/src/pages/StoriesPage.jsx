@@ -11,6 +11,7 @@ export default function StoriesPage({ lab }) {
   const general = story.talkTrack.filter((t) => !/^S\d{2}$/.test(t.id));
   return (
     <div className="stack">
+      {story.talkTrackProblem && <p className="field-error" role="alert" data-testid="talk-problem">{visible(story.talkTrackProblem)}</p>}
       <p className="muted" data-testid="stories-for">Told for <strong>{visible(story.cast.castBrand)}</strong>, an invented example (vertical: {visible(story.verticals.find((v) => v.id === story.vertical)?.label || story.vertical)}). Pick another vertical in the header; the models and numbers do not change, only the words.</p>
       <div className="card-grid card-grid--wide" data-testid="story-grid">
         {story.stories.map((s) => (

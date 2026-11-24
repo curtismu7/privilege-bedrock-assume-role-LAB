@@ -85,3 +85,16 @@ test('GET /api/story: the vertical picker, the configured brand on its own verti
     assert.equal((await lab.send('POST', '/api/story', {})).status, 405);
   } finally { await lab.close(); }
 });
+
+test('a missing talk track is logged, never silent; GET /api/story names the problem only when there is one; customer.config warnings reach the page', async () => {
+  const errs = [];
+  const orig = console.error; console.error = (m) => errs.push(String(m));
+  try { assert.deepEqual(loadTalkTrack(new URL('file:///nonexistent/talk-track.md')), []); } finally { console.error = orig; }
+  assert.equal(errs.length, 1); assert.match(errs[0], /docs\/talk-track\.md could not be read \(ENOENT\)/);
+  const lab = await startLab({ customer: validateConfig({ name: '<script>', vertical: 'mining' }) });
+  try {
+    const j = (await lab.get('/api/story')).json;
+    assert.equal(j.talkTrackProblem, null); assert.ok(j.talkTrack.length > 10);
+    assert.ok(j.warnings.length >= 2, j.warnings.join('; '));
+  } finally { await lab.close(); }
+});

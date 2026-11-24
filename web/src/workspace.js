@@ -5,11 +5,17 @@ const KEY = "pba.workspace";
 export const WORKSPACE_ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
 let memo = null;
 
+// Fills the array IN PLACE (a typed array's map() returns a new array and would leave this one zero, so every tab would share one id).
+export function fillRandom(bytes, cryptoImpl) {
+  if (cryptoImpl && typeof cryptoImpl.getRandomValues === "function") return cryptoImpl.getRandomValues(bytes);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return bytes;
+}
+
 export function workspaceId() {
   if (memo) return memo;
   try { const saved = window.sessionStorage.getItem(KEY); if (saved && WORKSPACE_ID.test(saved)) return (memo = saved); } catch { /* blocked */ }
-  const bytes = new Uint8Array(8);
-  (window.crypto || { getRandomValues: (a) => a.map(() => Math.floor(Math.random() * 256)) }).getRandomValues(bytes);
+  const bytes = fillRandom(new Uint8Array(8), window.crypto);
   memo = `w-${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
   try { window.sessionStorage.setItem(KEY, memo); } catch { /* blocked */ }
   return memo;

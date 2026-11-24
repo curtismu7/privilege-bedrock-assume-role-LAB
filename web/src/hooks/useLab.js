@@ -22,6 +22,8 @@ export default function useLab() {
   const [busy, setBusy] = useState(false);
   const [epoch, setEpoch] = useState(0);
   const seq = useRef(0);
+  // Goes up whenever the visitor starts over (Reset, a new vertical, a mode switch): a run that was already in flight must not write its result into the new view.
+  const gen = useRef(0);
 
   // `v` is the vertical to ask for. The FIRST load passes none, so the configured customer vertical (and its cast overrides) is what comes back;
   // later loads pass the one the visitor has picked.
@@ -36,28 +38,34 @@ export default function useLab() {
   }, []);
 
   useEffect(() => { load(undefined); }, [load]);
-  const setVertical = useCallback((v) => { setVerticalState(v); setEpoch((n) => n + 1); load(v); }, [load]);
+  const setVertical = useCallback((v) => { gen.current++; setVerticalState(v); setLast(null); setObs(null); setEpoch((n) => n + 1); load(v); }, [load]);
   const setDraft = useCallback((name, value) => setDrafts((d) => ({ ...d, [name]: typeof value === "function" ? value(d[name]) : value })), []);
 
   // Rule 19: the server decides. A 409 (Real not available) is shown as the server worded it; nothing else changes.
   const switchMode = useCallback(async (source) => {
+    if (source === info?.source) return { ok: true }; // pressing the mode that is already active changes nothing: no request, no reload
     const r = await setMode(source);
     if (!r.ok) { setModeError(r.body?.message || `The mode did not change (HTTP ${r.status})`); return { ok: false, message: r.body?.message }; }
+    gen.current++;
     setModeError(null); setLast(null); setObs(null); setEpoch((n) => n + 1);
     await load(vertical);
     return { ok: true };
-  }, [load, vertical]);
+  }, [load, vertical, info]);
 
   const refreshObs = useCallback(async () => {
+    const mine = gen.current;
     const r = await getObservability();
+    if (mine !== gen.current) return;
     setObs(r.ok ? r.body : { record: { error: r.body?.error || "run_observability_failed", message: r.body?.message || `HTTP ${r.status}` }, streams: [] });
   }, []);
 
   // A call is data, a refusal included (HTTP 200 with ok false). Only a validation or transport failure (4xx/5xx) is returned as { ok: false } for the page to show.
   const runCall = useCallback(async (payload) => {
     setBusy(true);
+    const mine = gen.current;
     try {
       const r = await postCall(payload);
+      if (mine !== gen.current) return { ok: true, stale: true }; // the visitor started over while this was running: drop it
       if (!r.ok) return { ok: false, status: r.status, message: say(r, "The call"), code: r.body?.error };
       const { runId, trace, state, ...result } = r.body;
       setLast({ kind: "live", page: "assumed-role", result, runId, trace });
@@ -68,8 +76,10 @@ export default function useLab() {
 
   const runScenario = useCallback(async (id) => {
     setBusy(true);
+    const mine = gen.current;
     try {
       const r = await postScenario(id);
+      if (mine !== gen.current) return { ok: true, stale: true };
       if (!r.ok) return { ok: false, status: r.status, message: say(r, "The scenario"), code: r.body?.error };
       const { runId, trace, ...result } = r.body;
       const { id: sid, kind, title, summary, expect, pass, mismatches } = result;
@@ -80,6 +90,7 @@ export default function useLab() {
   }, [refreshObs]);
 
   const reset = useCallback(async () => {
+    gen.current++;
     const r = await postReset();
     setLast(null); setObs(null); setDrafts({}); setEpoch((n) => n + 1);
     await load(vertical);

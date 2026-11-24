@@ -103,3 +103,10 @@ describe("Diagram page: drawn from diagram-studio data by name", () => {
     await waitFor(() => expect(screen.getByTestId("step-caption")).toHaveTextContent(/walks the 5 arrows/));
   });
 });
+
+describe("Stories page: a missing talk track is named", () => {
+  it("shows the server's talkTrackProblem plainly", async () => {
+    await h.mount({ page: "stories", overrides: { "/api/story": async (_i, _u, go) => { const r = await go(); const b = await r.json(); return jsonResponse(200, { ...b, talkTrack: [], talkTrackProblem: "docs/talk-track.md is missing or empty, so there is no talk track to show" }); } } });
+    expect(await screen.findByTestId("talk-problem")).toHaveTextContent(/no talk track to show/);
+  });
+});

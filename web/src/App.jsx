@@ -67,9 +67,12 @@ export default function App() {
 
   const pickTheme = (next) => { try { if (next === "auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, next); } catch { /* not remembered */ } setTheme(next); };
   const select = (id) => { setPage(id); try { window.history.replaceState(null, "", `#${id}`); } catch { /* ignore */ } };
+  // A scenario in the address ("#assumed-role/<id>") would run again when the page remounts: Reset, a mode switch and a new vertical leave only the page.
+  const clearScenarioHash = () => { try { window.history.replaceState(null, "", `#${page}`); } catch { /* ignore */ } };
   const reset = async () => {
-    // A scenario in the address ("#assumed-role/<id>") would run again when the page remounts: Reset leaves only the page.
-    try { window.history.replaceState(null, "", `#${page}`); } catch { /* ignore */ }
+    // The shared TopMenu has no way to disable its Reset button, so while a run is in flight Reset says so instead (a run that finishes after a Reset is dropped anyway).
+    if (lab.busy) { setResetMsg("A run is in progress: Reset again when it has finished."); return; }
+    clearScenarioHash();
     const ok = await lab.reset();
     setResetMsg(ok ? "Reset: the key is back to the default assumed-role key with its default policies, the lab clock is at zero, the audit log and the last run are cleared and the diagram is back in place." : "Reset failed on the server; the view was reloaded.");
   };
@@ -92,7 +95,7 @@ export default function App() {
           {PAGES.map((p) => <a key={p.id} href={`#${p.id}`} aria-current={page === p.id ? "page" : undefined} onClick={(e) => { e.preventDefault(); select(p.id); }}>{p.label}</a>)}
         </nav>
         <TopMenu
-          vertical={{ value: lab.vertical, onChange: lab.setVertical, options: story ? story.verticals.map((v) => v.id) : [lab.vertical] }}
+          vertical={{ value: lab.vertical, onChange: (v) => { clearScenarioHash(); lab.setVertical(v); }, options: story ? story.verticals.map((v) => v.id) : [lab.vertical] }}
           theme={{ value: theme, onChange: pickTheme }}
           fontSize={{ value: fontStep, onChange: setFontStep }}
           present={{ active: presenter, onToggle: () => setPresenter((v) => !v), label: "Presenter (P)" }}
@@ -100,7 +103,7 @@ export default function App() {
           help={{ href: "https://github.com/curtismu7/privilege-bedrock-assume-role-LAB#readme" }}
           version={info?.version ? `v${info.version}` : null}
           onReset={reset}
-          extra={<ModeToggle source={source || "mock"} info={info} onSwitch={lab.switchMode} />}
+          extra={<ModeToggle source={source || "mock"} info={info} onSwitch={(s) => { if (s !== source) clearScenarioHash(); return lab.switchMode(s); }} />}
         />
       </header>
       <main className="page">

@@ -26,7 +26,7 @@ import { verdictFor } from './verdicts.js';
 import { createWorkspaces, workspaceFrom, WorkspaceError } from './workspaces.js';
 import { castForVertical, loadCustomerConfig, publicConfig } from './customer.js';
 import { buildStories } from './stories.js';
-import { buildTalkTrack } from './talkTrack.js';
+import { buildTalkTrack, loadTalkTrack } from './talkTrack.js';
 import { DIAGRAM_NAMES, buildDiagram, hasDiagram } from './diagramData.js';
 import { MAX_RUNS, STREAMS, buildRunRecord, decisionLine, durationMs, eventsFor, itemsFor } from './runObs.js';
 import { exchangesFor } from './runTrace.js';
@@ -195,7 +195,8 @@ export function createApp({
   api.get('/story', (req, res) => {
     const pick = castForVertical(customer, req.query.vertical);
     if (!pick) throw refuse('unknown_vertical', 'no such vertical', 400);
-    res.json({ ...publicConfig(customer), vertical: pick.vertical, cast: pick.cast, stories: buildStories(pick.cast).map((st) => ({ ...st, page: scenarioById(st.scenario)?.kind === 'vertex' ? 'vertex' : 'assumed-role' })), talkTrack: buildTalkTrack(pick.cast), banner: BANNER, unverified: UNVERIFIED });
+    const sections = loadTalkTrack();
+    res.json({ ...publicConfig(customer), vertical: pick.vertical, cast: pick.cast, talkTrackProblem: sections.length === 0 ? 'docs/talk-track.md is missing or empty, so there is no talk track to show' : null, stories: buildStories(pick.cast).map((st) => ({ ...st, page: scenarioById(st.scenario)?.kind === 'vertex' ? 'vertex' : 'assumed-role' })), talkTrack: buildTalkTrack(pick.cast, sections), banner: BANNER, unverified: UNVERIFIED });
   });
 
   // Rule 17: the diagram by name, from diagram-studio data.

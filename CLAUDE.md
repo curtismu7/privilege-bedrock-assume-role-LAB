@@ -10,4 +10,21 @@ Demo-tier standalone lab, step 2 (engine, API and web UI). The repo exists (`cur
 - Rule 27: `runObs.js` builds the run's events, one stdout line per decision and the record for the shared panel (all `simulated`); the lab reads no logs. Trace: `runTrace.js` (step 1 is the app's call with the six hops as decisions, then one step per call the gateway really made). `verdicts.js` names every result code once.
 - Docker: `docker-compose.yml` publishes `127.0.0.1:7838` only, non-root, read-only, `restart: unless-stopped`; pinned by `scripts/compose.test.mjs`. `.dockerignore` must keep `docs/talk-track.md` (the image copies it): prove a Dockerfile change by building the image, not by a text test.
 - Not built yet: Real mode, the shelf registry entry, proxy route, submodule pin and release (step 3, owner-gated), Story mode.
-- Never-repeat lessons: a worktree basename must be unique (air-test names its remote folder after it); `new URL('./x', import.meta.url)` in a server file the web tests import must go through a variable (Vite rewrites the literal); a missing `/assets` file is a 404, never `index.html`; the first story load sends no `vertical` (a default param must not turn undefined into `retail`); Reset clears the scenario hash or a remount re-runs it; the shared `RunObservability` remounts when its record arrives, so a test waits for `ro-table`, not `run-observability`.
+
+## Never-repeat lessons
+- A worktree basename must be unique (air-test names its remote folder after it).
+- `new URL('./x', import.meta.url)` in a server file the web tests import must go through a variable (Vite rewrites the literal).
+- A missing `/assets` file is a 404, never `index.html`.
+- Dockerfile COPY sources must not be excluded by `.dockerignore` (a compose test checks it; a real OrbStack build proves it).
+- The first story/talk-track load sends no `vertical` (a default param must not turn undefined into `retail`), so the customer's vertical and cast words arrive.
+- Reset, a mode switch and a vertical change clear the scenario from the address; a page runs a hash scenario only on a deliberate navigation (page open or `hashchange`; its own buttons use `replaceState`).
+- A run that finishes after Reset, a mode switch or a vertical change is dropped (`gen` counter in `useLab`); the shared menu cannot disable Reset, so Reset says "a run is in progress" instead.
+- The workspace-id pattern is the same on client and server, and the random fallback fills the array in place (`map()` on a typed array leaves it zero).
+- Pressing the active Mock button changes nothing (no request, no reload).
+- `npm run reset` takes a workspace id (argument or `WORKSPACE`) and clears that workspace only.
+- Netguard allows literal IPs through the guarded `lookup` for an opted-in bind; connecting to them is still refused.
+- Shortcut keys ignore modifiers, repeats and focused controls.
+- Tests must pass with and without `web/dist` (`startLab` defaults `distDir` to a directory that does not exist; only the web-serving tests opt in).
+- The role-service trace shows whether the key sent an external ID from the call itself (`externalIdSent`), never a fixed string.
+- Static scans skip `.github/` and the shared attribution script.
+- Before claiming a port check running containers and compose files (`docker ps`; the ap-* labs use 7839 to 7843), not only the registry.

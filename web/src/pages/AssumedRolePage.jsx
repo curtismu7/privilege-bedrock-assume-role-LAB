@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getKeyShapes, getScenarios, getState } from "../api";
 import { Card, Loading } from "../components/Bits.jsx";
 import useDraft from "../hooks/useDraft";
+import useScenarioHash from "../hooks/useScenarioHash";
 import CallPanel from "./CallPanel.jsx";
 import KeyPanel from "./KeyPanel.jsx";
 import PolicyPanel from "./PolicyPanel.jsx";
@@ -11,9 +12,6 @@ import Snippets from "./Snippets.jsx";
 import { visible } from "../safeText";
 
 export const PAGE = "assumed-role";
-// "#assumed-role/<scenario>" (the Stories page, a shared link) runs that scenario once the page has loaded.
-const scenarioFromHash = (page) => { const parts = window.location.hash.replace("#", "").split("/"); return parts[0] === page && parts[1] ? parts[1] : null; };
-export { scenarioFromHash };
 
 export default function AssumedRolePage({ lab }) {
   const { info } = lab;
@@ -44,13 +42,11 @@ export default function AssumedRolePage({ lab }) {
   }, [lab]);
   const pick = (s) => { if (s.kind === "vertex") window.location.hash = `#vertex/${s.id}`; else runScenario(s.id); };
 
-  useEffect(() => {
-    const id = scenarioFromHash(PAGE);
-    const sc = scenarios.find((s) => s.id === id);
-    if (!sc) return;
-    if (sc.kind === "vertex") window.location.hash = `#vertex/${id}`;
-    else if (lab.last?.id !== id) runScenario(id);
-  }, [scenarios.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // "#assumed-role/<scenario>" (the Stories page, a shared link) runs that scenario when the page opens and when the address changes to one.
+  useScenarioHash(PAGE, scenarios, (sc) => {
+    if (sc.kind === "vertex") window.location.hash = `#vertex/${sc.id}`;
+    else if (!(lab.last?.id === sc.id && lab.last.page === PAGE)) runScenario(sc.id);
+  });
 
   const use = (s) => { if (s.id === "trust") setTrust(s.text); else if (s.id === "permission") setPermission(s.text); };
   const active = lab.last?.kind === "scenario" && lab.last.page === PAGE ? lab.last.id : null;
