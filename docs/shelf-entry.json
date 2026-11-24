@@ -1,0 +1,22 @@
+{
+  "demos": [
+    {
+      "id": "privilege-bedrock-assume-role-lab",
+      "name": "Privilege Bedrock assume-role LAB",
+      "kind": "Demo",
+      "description": "An LLM key reaches Bedrock under an assumed IAM role and stores no cloud credential, with metering, AI Guard and audit still on the call. Thirteen scenarios, each failure named with its fix, plus a Vertex tab. Mock only; beyond the release-notes claims everything is the lab's model and UNVERIFIED.",
+      "url": "http://localhost:7838",
+      "healthPath": "/api/health",
+      "composeFile": "privilege-bedrock-assume-role-LAB/docker-compose.yml",
+      "composeOverlays": [],
+      "pingProducts": [],
+      "notes": "Host-run: ./scripts/run.sh (port 7838, PROVISIONAL and not claimed on the board). Mock needs no tenant and no credentials; Real is not built (the toggle is disabled with the reason). Docker: HOST_PORT=7838 docker compose up --build -d (published on 127.0.0.1 only). catalogId D000 is a placeholder: the owner assigns the real catalog id and the port before the registry entry is made. Repo: curtismu7/privilege-bedrock-assume-role-LAB.",
+      "repo": "https://github.com/curtismu7/privilege-bedrock-assume-role-LAB",
+      "catalogId": "D000",
+      "alsoCatalogIds": [],
+      "tags": ["pingone-privilege", "agent-controls", "aws", "aws-bedrock", "simulated"],
+      "where": "installed",
+      "addedAt": "2026-11-24"
+    }
+  ]
+}

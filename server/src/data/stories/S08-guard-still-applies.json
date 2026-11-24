@@ -1,0 +1,8 @@
+{
+  "id": "S08",
+  "scenario": "guard-still-applies",
+  "title": "AI Guard still applies to this key",
+  "goal": "Does an assumed role let a prompt past the guard? {{castOwner}} wants to know.",
+  "obstacle": "An assumed-role key changes how the gateway authenticates to Bedrock, not what the guard sees.",
+  "control": "A prompt carrying the stub guard's marker is blocked before any role is assumed. No session, no invoke, no metering, and the block is audited."
+}

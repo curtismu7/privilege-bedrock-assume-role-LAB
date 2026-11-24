@@ -1,0 +1,384 @@
+{
+  "schema": "demo-content-pack/1",
+  "id": "privilege-bedrock-assume-role-lab",
+  "title": "Privilege Bedrock assume-role LAB",
+  "version": "0.1.0",
+  "demo": {
+    "id": "privilege-bedrock-assume-role-lab",
+    "name": "Privilege Bedrock assume-role LAB",
+    "catalog": "D000",
+    "baseUrl": "http://localhost:7838",
+    "doctor": "/api/health",
+    "tags": [
+      "llm",
+      "bedrock",
+      "assume-role",
+      "vertex",
+      "privilege",
+      "simulated",
+      "mock-only"
+    ]
+  },
+  "glossary": [
+    {
+      "id": "assumed-role-key",
+      "term": "Assumed-role key",
+      "definition": "An LLM key that reaches Bedrock under an assumed IAM role and stores no provider credential. Metering, AI Guard and audit stay intact on the call, and the same route also works as a fallback target. These are the claims taken from the 2026-11-21 release notes; everything about how the lab shows them is its own model.",
+      "aliases": [
+        "assume role",
+        "no stored credential"
+      ]
+    },
+    {
+      "id": "trust-policy",
+      "term": "Trust policy",
+      "definition": "The policy on the role that says who may assume it. In the lab an Allow must name the principal the gateway presents, a Deny wins, and an optional external-ID condition is compared exactly. The lab reads a small subset of IAM as data and never evaluates policy text as code.",
+      "aliases": [
+        "role trust"
+      ]
+    },
+    {
+      "id": "permission-policy",
+      "term": "Permission policy",
+      "definition": "The policy on the role that says what it may do once assumed. The lab checks one action, bedrock:InvokeModel, on the model's ARN. Identity-side permissions, service control policies and permission boundaries are not modelled.",
+      "aliases": [
+        "invoke permission"
+      ]
+    },
+    {
+      "id": "external-id",
+      "term": "External ID",
+      "definition": "A value the trust policy can require and the key must carry. The lab compares it exactly and case-sensitively; an empty one counts as none. Missing and mismatched are two different named results with different fixes.",
+      "aliases": [
+        "sts:ExternalId"
+      ]
+    },
+    {
+      "id": "named-result",
+      "term": "Named result",
+      "definition": "Every way the role assumption or the invoke can fail has its own code, title and fix: wrong trust principal, external ID missing or mismatched, missing invoke permission, model not enabled in the region, expired session. The wording is the lab's own and UNVERIFIED.",
+      "aliases": [
+        "fix"
+      ]
+    },
+    {
+      "id": "vertex-service-account",
+      "term": "Vertex service account",
+      "definition": "On Vertex AI the gateway uses its own service account: no role is assumed, there is no external ID and no session. The lab needs a binding to a role that grants aiplatform.endpoints.predict (roles/aiplatform.user or roles/aiplatform.admin). The role model is the lab's own and UNVERIFIED.",
+      "aliases": [
+        "vertex"
+      ]
+    },
+    {
+      "id": "unverified-model",
+      "term": "UNVERIFIED (lab model)",
+      "definition": "Anything the release notes do not say is the lab's own model and is labelled UNVERIFIED: the console setup fields, the session length, every error text, the order of the checks, the principal the gateway presents, and whether an expired session refreshes by itself.",
+      "aliases": [
+        "lab model"
+      ]
+    }
+  ],
+  "sources": [],
+  "cards": [
+    {
+      "id": "try-success",
+      "label": "S01: The role is assumed and the call is served",
+      "description": "The key names a role. The gateway assumes it, the call is served, and the trace still shows the guard, metering and audit hops, all done.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/success"
+      },
+      "terms": [
+        "assumed-role-key"
+      ],
+      "story": "S01"
+    },
+    {
+      "id": "try-wrong-trust-principal",
+      "label": "S02: The trust policy names someone else",
+      "description": "The result is named: Wrong trust principal, with its fix. Nothing is invoked or metered and the refusal is audited.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/wrong-trust-principal"
+      },
+      "terms": [
+        "trust-policy",
+        "named-result"
+      ],
+      "story": "S02"
+    },
+    {
+      "id": "try-external-id-mismatch",
+      "label": "S03: The external ID does not match",
+      "description": "The result is External ID mismatch, with the fix: make the key's external ID equal the trust policy's value.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/external-id-mismatch"
+      },
+      "terms": [
+        "external-id",
+        "named-result"
+      ],
+      "story": "S03"
+    },
+    {
+      "id": "try-external-id-missing",
+      "label": "S04: The external ID was never set",
+      "description": "The result is External ID missing, and it is a different result from a mismatch, so the fix is different too.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/external-id-missing"
+      },
+      "terms": [
+        "external-id",
+        "named-result"
+      ],
+      "story": "S04"
+    },
+    {
+      "id": "try-missing-invoke-permission",
+      "label": "S05: The role cannot invoke the model",
+      "description": "The trace shows the assume succeeded and the invoke failed. The fix is to allow the invoke on the model for the support platform team's role.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/missing-invoke-permission"
+      },
+      "terms": [
+        "permission-policy",
+        "named-result"
+      ],
+      "story": "S05"
+    },
+    {
+      "id": "try-model-not-enabled-in-region",
+      "label": "S06: The model is not enabled in that region",
+      "description": "The result names the region problem and its fix: enable the model there, or point the key at a region where it is enabled.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/model-not-enabled-in-region"
+      },
+      "terms": [
+        "named-result"
+      ],
+      "story": "S06"
+    },
+    {
+      "id": "try-expired-session-refreshed",
+      "label": "S07: The session expires and is refreshed",
+      "description": "The clock reaches the expiry exactly; the next call assumes the role again and is served as session_refreshed on a new session.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/expired-session-refreshed"
+      },
+      "terms": [
+        "assumed-role-key",
+        "unverified-model"
+      ],
+      "story": "S07"
+    },
+    {
+      "id": "try-guard-still-applies",
+      "label": "S08: AI Guard still applies to this key",
+      "description": "A prompt carrying the stub guard's marker is blocked before any role is assumed. No session, no invoke, no metering, and the block is audited.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/guard-still-applies"
+      },
+      "terms": [
+        "assumed-role-key"
+      ],
+      "story": "S08"
+    },
+    {
+      "id": "try-stored-vs-assumed-key-shape",
+      "label": "S09: The key with no credential, next to the key with one",
+      "description": "The stored key shows a mask; the assumed-role key has no credential field at all, at any depth. Both are metered, guarded and audited the same way.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/stored-vs-assumed-key-shape"
+      },
+      "terms": [
+        "assumed-role-key"
+      ],
+      "story": "S09"
+    },
+    {
+      "id": "try-assumed-role-as-fallback-target",
+      "label": "S10: The assumed-role key serves as a fallback",
+      "description": "The assumed-role key is the second target and serves, still metered, guarded and audited. The chain logic belongs to the fallback lab.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#assumed-role/assumed-role-as-fallback-target"
+      },
+      "terms": [
+        "assumed-role-key"
+      ],
+      "story": "S10"
+    },
+    {
+      "id": "try-vertex-with-role",
+      "label": "S11: Vertex AI: the service account has the role",
+      "description": "A binding to a role that grants the predict permission lets the call through.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#vertex/vertex-with-role"
+      },
+      "terms": [
+        "vertex-service-account"
+      ],
+      "story": "S11"
+    },
+    {
+      "id": "try-vertex-without-role",
+      "label": "S12: Vertex AI: the service account has no role",
+      "description": "The result is Service account has no role, with the fix: bind a role that grants the permission.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#vertex/vertex-without-role"
+      },
+      "terms": [
+        "vertex-service-account",
+        "named-result"
+      ],
+      "story": "S12"
+    },
+    {
+      "id": "try-vertex-role-insufficient",
+      "label": "S13: Vertex AI: a role that does not grant the call",
+      "description": "The result is Role does not grant the call, a different result from having no role at all.",
+      "group": "try-it",
+      "action": {
+        "type": "route",
+        "href": "/#vertex/vertex-role-insufficient"
+      },
+      "terms": [
+        "vertex-service-account",
+        "named-result"
+      ],
+      "story": "S13"
+    },
+    {
+      "id": "concept-limits",
+      "label": "What is sourced and what is the lab's model",
+      "description": "The release-notes claims, the lab's own model and the list of what is UNVERIFIED.",
+      "group": "concept",
+      "action": {
+        "type": "route",
+        "href": "/#limits"
+      },
+      "terms": [
+        "unverified-model"
+      ]
+    },
+    {
+      "id": "ref-doctor",
+      "label": "Doctor and health",
+      "description": "Preflight checks and the demo-health/1 endpoint.",
+      "group": "setup",
+      "action": {
+        "type": "route",
+        "href": "/api/health"
+      }
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "bedrock-assumed-role",
+      "label": "Bedrock under an assumed role: no stored credential",
+      "href": "/#diagram",
+      "mode": "mock"
+    }
+  ],
+  "stories": [
+    {
+      "id": "S01",
+      "title": "The role is assumed and the call is served",
+      "say": "The key names a role. The gateway assumes it, the call is served, and the trace still shows the guard, metering and audit hops, all done.",
+      "file": "server/src/data/stories/S01-success.json"
+    },
+    {
+      "id": "S02",
+      "title": "The trust policy names someone else",
+      "say": "The result is named: Wrong trust principal, with its fix. Nothing is invoked or metered and the refusal is audited.",
+      "file": "server/src/data/stories/S02-wrong-trust-principal.json"
+    },
+    {
+      "id": "S03",
+      "title": "The external ID does not match",
+      "say": "The result is External ID mismatch, with the fix: make the key's external ID equal the trust policy's value.",
+      "file": "server/src/data/stories/S03-external-id-mismatch.json"
+    },
+    {
+      "id": "S04",
+      "title": "The external ID was never set",
+      "say": "The result is External ID missing, and it is a different result from a mismatch, so the fix is different too.",
+      "file": "server/src/data/stories/S04-external-id-missing.json"
+    },
+    {
+      "id": "S05",
+      "title": "The role cannot invoke the model",
+      "say": "The trace shows the assume succeeded and the invoke failed. The fix is to allow the invoke on the model for the support platform team's role.",
+      "file": "server/src/data/stories/S05-missing-invoke-permission.json"
+    },
+    {
+      "id": "S06",
+      "title": "The model is not enabled in that region",
+      "say": "The result names the region problem and its fix: enable the model there, or point the key at a region where it is enabled.",
+      "file": "server/src/data/stories/S06-model-not-enabled-in-region.json"
+    },
+    {
+      "id": "S07",
+      "title": "The session expires and is refreshed",
+      "say": "The clock reaches the expiry exactly; the next call assumes the role again and is served as session_refreshed on a new session.",
+      "file": "server/src/data/stories/S07-expired-session-refreshed.json"
+    },
+    {
+      "id": "S08",
+      "title": "AI Guard still applies to this key",
+      "say": "A prompt carrying the stub guard's marker is blocked before any role is assumed. No session, no invoke, no metering, and the block is audited.",
+      "file": "server/src/data/stories/S08-guard-still-applies.json"
+    },
+    {
+      "id": "S09",
+      "title": "The key with no credential, next to the key with one",
+      "say": "The stored key shows a mask; the assumed-role key has no credential field at all, at any depth. Both are metered, guarded and audited the same way.",
+      "file": "server/src/data/stories/S09-stored-vs-assumed-key-shape.json"
+    },
+    {
+      "id": "S10",
+      "title": "The assumed-role key serves as a fallback",
+      "say": "The assumed-role key is the second target and serves, still metered, guarded and audited. The chain logic belongs to the fallback lab.",
+      "file": "server/src/data/stories/S10-assumed-role-as-fallback-target.json"
+    },
+    {
+      "id": "S11",
+      "title": "Vertex AI: the service account has the role",
+      "say": "A binding to a role that grants the predict permission lets the call through.",
+      "file": "server/src/data/stories/S11-vertex-with-role.json"
+    },
+    {
+      "id": "S12",
+      "title": "Vertex AI: the service account has no role",
+      "say": "The result is Service account has no role, with the fix: bind a role that grants the permission.",
+      "file": "server/src/data/stories/S12-vertex-without-role.json"
+    },
+    {
+      "id": "S13",
+      "title": "Vertex AI: a role that does not grant the call",
+      "say": "The result is Role does not grant the call, a different result from having no role at all.",
+      "file": "server/src/data/stories/S13-vertex-role-insufficient.json"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "S09",
+  "scenario": "stored-vs-assumed-key-shape",
+  "title": "The key with no credential, next to the key with one",
+  "goal": "{{castBrand}} wants to see exactly what changes on the key.",
+  "obstacle": "A stored-credential key holds a secret that has to be protected and rotated.",
+  "control": "The stored key shows a mask; the assumed-role key has no credential field at all, at any depth. Both are metered, guarded and audited the same way."
+}

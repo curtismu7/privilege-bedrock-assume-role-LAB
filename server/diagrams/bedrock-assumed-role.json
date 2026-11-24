@@ -1,0 +1,148 @@
+{
+  "schema": "diagram-studio/1",
+  "id": "bedrock-assumed-role",
+  "title": "Bedrock under an assumed role: no stored credential",
+  "lede": "An LLM key can reach Amazon Bedrock under an assumed IAM role with no provider credential stored on the key, and with metering, AI Guard and audit intact; it also works as a fallback target (release notes). Google Vertex AI as the gateway’s own service account is the sibling feature and is not drawn. The role, trust policy, external ID and short-lived credentials are the lab’s own model.",
+  "groups": {
+    "key": {
+      "label": "Caller",
+      "color": "dark"
+    },
+    "gw": {
+      "label": "Gateway",
+      "color": "red"
+    },
+    "aws": {
+      "label": "Customer’s AWS account (lab model)",
+      "color": "blue"
+    },
+    "obs": {
+      "label": "Same call",
+      "color": "grey"
+    }
+  },
+  "nodes": [
+    {
+      "id": "key",
+      "group": "key",
+      "label": "LLM key",
+      "sub": [
+        "No provider credential stored on the key",
+        "Release notes"
+      ],
+      "x": 0,
+      "y": 140
+    },
+    {
+      "id": "gw",
+      "group": "gw",
+      "label": "Gateway",
+      "sub": [
+        "Reaches Bedrock under an assumed IAM role (release notes)"
+      ],
+      "x": 400,
+      "y": 140
+    },
+    {
+      "id": "role",
+      "group": "aws",
+      "label": "Customer IAM role",
+      "sub": [
+        "Trust policy and external ID: lab model",
+        "Who may assume it: lab model"
+      ],
+      "x": 800,
+      "y": 0
+    },
+    {
+      "id": "bedrock",
+      "group": "aws",
+      "label": "Amazon Bedrock",
+      "sub": [
+        "The model call runs under the assumed role (release notes)",
+        "Also works as a fallback target (release notes)"
+      ],
+      "x": 800,
+      "y": 140
+    },
+    {
+      "id": "obs",
+      "group": "obs",
+      "label": "Metering, AI Guard, audit",
+      "sub": [
+        "Intact on the same call",
+        "Release notes"
+      ],
+      "x": 800,
+      "y": 290
+    }
+  ],
+  "edges": [
+    {
+      "source": "key",
+      "target": "gw",
+      "label": "1 call with the key"
+    },
+    {
+      "source": "gw",
+      "target": "role",
+      "label": "2 assume the role (lab model)"
+    },
+    {
+      "source": "role",
+      "target": "gw",
+      "label": "3 short-lived credentials (lab model)"
+    },
+    {
+      "source": "gw",
+      "target": "bedrock",
+      "label": "4 the model call"
+    },
+    {
+      "source": "gw",
+      "target": "obs",
+      "label": "5 metering, AI Guard, audit"
+    }
+  ],
+  "steps": [
+    {
+      "title": "The key holds no credential",
+      "what": "The call arrives with an LLM key that stores no provider credential (release notes).",
+      "edges": [
+        0
+      ]
+    },
+    {
+      "title": "Assume the customer’s role",
+      "what": "The gateway assumes an IAM role to reach Bedrock. In the lab model the role’s trust policy has to name the gateway, and an external ID can be required.",
+      "why": "Lab model. UNVERIFIED: the console fields, the session length and the error text. Failures the lab shows, each with its own named result: wrong trust principal, external ID mismatch, missing invoke permission, model not enabled in the region, expired session.",
+      "edges": [
+        1
+      ]
+    },
+    {
+      "title": "Short-lived credentials",
+      "what": "In the lab model the role hands short-lived credentials back to the gateway, used for this call and refreshed when they expire.",
+      "why": "Session length and refresh are lab model and UNVERIFIED.",
+      "edges": [
+        2
+      ]
+    },
+    {
+      "title": "Call Bedrock",
+      "what": "The gateway makes the model call on Amazon Bedrock under the assumed role and the answer comes back through the gateway (release notes: the same route also works as a fallback target).",
+      "why": "The gateway, not the role, makes the call (lab model).",
+      "edges": [
+        3
+      ]
+    },
+    {
+      "title": "Metering, AI Guard and audit",
+      "what": "The same call is metered, passes through AI Guard and is written to audit.",
+      "why": "Release notes: metering, AI Guard and audit intact.",
+      "edges": [
+        4
+      ]
+    }
+  ]
+}

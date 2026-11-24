@@ -1,0 +1,30 @@
+# OrbStack:  HOST_PORT=7838 docker compose up --build -d   ->  http://127.0.0.1:7838
+# The server binds 0.0.0.0 INSIDE the container (PBA_BIND is the opt-in), but the port is published on loopback only.
+# Do not change the 127.0.0.1 below. 7838 is PROVISIONAL (not claimed on the board yet); HOST_PORT stays in 7800-7999.
+# Branding (customer.config.json, rule 12): the root file system is read-only, so the file is mounted, never written. Uncomment the volumes block and
+# set CUSTOMER_CONFIG=/config/customer.config.json (copy customer.config.example.json first; the file is git-ignored). The mount must be read-only.
+name: privilege-bedrock-assume-role-lab
+
+services:
+  privilege-bedrock-assume-role-lab:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HOST_PORT:-7838}:7838"
+    environment:
+      PORT: "7838"
+      PBA_BIND: 0.0.0.0
+      LAB_ALLOWED_HOSTS: ${LAB_ALLOWED_HOSTS:-}
+      CUSTOMER_CONFIG: ${CUSTOMER_CONFIG:-}
+    # volumes:
+    #   - ./customer.config.json:/config/customer.config.json:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7838/api/health').then(r=>r.json()).then(j=>process.exit(j.schema==='demo-health/1'&&j.state==='ready'?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      start_period: 5s
+      start_interval: 2s
+      timeout: 5s
+      retries: 3

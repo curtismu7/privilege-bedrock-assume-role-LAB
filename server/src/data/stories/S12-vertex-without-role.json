@@ -1,0 +1,8 @@
+{
+  "id": "S12",
+  "scenario": "vertex-without-role",
+  "title": "Vertex AI: the service account has no role",
+  "goal": "The key was registered by {{castOwner}}, but the Vertex call is refused.",
+  "obstacle": "The policy binds a different service account.",
+  "control": "The result is Service account has no role, with the fix: bind a role that grants the permission."
+}

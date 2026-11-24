@@ -1,0 +1,8 @@
+{
+  "id": "S04",
+  "scenario": "external-id-missing",
+  "title": "The external ID was never set",
+  "goal": "Although the role trusts the gateway, {{castApp}} is refused.",
+  "obstacle": "The trust policy requires an external ID and the key carries none; an empty one counts as none.",
+  "control": "The result is External ID missing, and it is a different result from a mismatch, so the fix is different too."
+}

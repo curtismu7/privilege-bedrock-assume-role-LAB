@@ -1,0 +1,8 @@
+{
+  "id": "S11",
+  "scenario": "vertex-with-role",
+  "title": "Vertex AI: the service account has the role",
+  "goal": "{{castBrand}} also uses Vertex AI through the gateway.",
+  "obstacle": "On Vertex the gateway uses its own service account; no role is assumed and there is no external ID.",
+  "control": "A binding to a role that grants the predict permission lets the call through."
+}

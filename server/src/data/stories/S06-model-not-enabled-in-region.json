@@ -1,0 +1,8 @@
+{
+  "id": "S06",
+  "scenario": "model-not-enabled-in-region",
+  "title": "The model is not enabled in that region",
+  "goal": "The role may invoke the model, yet the call fails for {{castBrand}}.",
+  "obstacle": "The model is not enabled in ap-southeast-2 for the account.",
+  "control": "The result names the region problem and its fix: enable the model there, or point the key at a region where it is enabled."
+}
