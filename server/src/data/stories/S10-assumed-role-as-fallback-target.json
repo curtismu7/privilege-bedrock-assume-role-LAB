@@ -1,0 +1,8 @@
+{
+  "id": "S10",
+  "scenario": "assumed-role-as-fallback-target",
+  "title": "The assumed-role key serves as a fallback",
+  "goal": "When its first model is down, {{castApp}} must keep serving.",
+  "obstacle": "The primary answers 503.",
+  "control": "The assumed-role key is the second target and serves, still metered, guarded and audited. The chain logic belongs to the fallback lab."
+}

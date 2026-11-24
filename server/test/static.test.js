@@ -18,14 +18,20 @@ const ATTRIBUTION = new RegExp(['Co-Authored-', 'By|Generated', ' with|claude\\.
 const text = (p) => fs.readFileSync(p, 'utf8');
 // The CI workflow names the CI tool's download host, and the shared check script names the patterns it searches for: both are skipped.
 const isWorkflow = (p) => p.includes(`${path.sep}.github${path.sep}`);
-const mine = files.filter((p) => !p.endsWith('package-lock.json') && !p.endsWith('.sha256') && !p.endsWith('check-no-ai-attribution.sh') && !isWorkflow(p));
+const mine = files.filter((p) => !p.endsWith('package-lock.json') && !p.endsWith('.sha256') && !p.endsWith('check-no-ai-attribution.sh') && !isWorkflow(p) && !p.includes(`${path.sep}web${path.sep}dist${path.sep}`));
+// Files copied byte for byte from the family's shared components (each pinned by its own test) or from a shared tool: their text is not this lab's.
+const VENDORED = [/web\/src\/(diagram-kit|top-menu|floating-dialog|gateway-trace|run-observability|talk-track)\//, /web\/src\/components\/(JsonPane|jsonpane)/, /web\/src\/standalone-ui\.css$/,
+  /server\/src\/(gatewayTrace|runObservability|diagramStudioValidate|health)\.js$/, /scripts\/(run-observability-checkPin|check-ui-standard)\./, /docs\/content-pack\.schema\.json$/];
+const OWN_REPO = /^github\.com\/curtismu7\/privilege-bedrock-assume-role-LAB(\/|$)/i;
+const isVendored = (p) => VENDORED.some((re) => re.test(p.split(path.sep).join('/')));
 
-test('every host named in shipped text is loopback, .example or .invalid (the apex example.com is not allowed)', () => {
+test('every host named in this lab\'s own text is loopback, .example or .invalid, or this lab\'s own repo (the apex example.com is not allowed)', () => {
   const bad = [];
-  for (const p of mine) {
-    for (const m of text(p).matchAll(/\b(?:https?|wss?):\/\/([^\s/?#"'`<>\\)]+)/gi)) {
-      const h = m[1].replace(/:\d+$/, '').toLowerCase();
-      if (!(/^(localhost|127\.0\.0\.1|\[::1\]|::1)$/.test(h) || /(^|\.)(example|invalid)$/.test(h) || h === '${host}' || h.includes('${'))) bad.push(`${path.relative(ROOT, p)}: ${h}`);
+  for (const p of mine.filter((f) => !isVendored(f))) {
+    for (const m of text(p).matchAll(/\b(?:https?|wss?):\/\/([^\s"'`<>\\)#?]+)/gi)) {
+      const h = m[1].replace(/:\d+(?=\/|$)/, '').toLowerCase();
+      const host = h.split('/')[0];
+      if (!(/^(localhost|127\.0\.0\.1|\[::1\]|::1)$/.test(host) || /(^|\.)(example|invalid)$/.test(host) || host === '${host}' || host.includes('${') || OWN_REPO.test(h))) bad.push(`${path.relative(ROOT, p)}: ${h}`);
     }
   }
   assert.deepEqual(bad, []);
@@ -74,7 +80,7 @@ test('node:test is run with a glob, never a directory', () => {
 
 test('CI workflow, licence and the shared attribution script are present; doctor runs on the provisional port', () => {
   const ci = text(path.join(ROOT, '.github/workflows/ci.yml'));
-  for (const job of ['test:', 'doctor:', 'forbidden-strings:', 'gitleaks:']) assert.ok(ci.includes(`\n  ${job}`), job);
+  for (const job of ['build:', 'test:', 'doctor:', 'forbidden-strings:', 'gitleaks:']) assert.ok(ci.includes(`\n  ${job}`), job);
   assert.match(ci, /PORT=7838 npm run doctor/);
   assert.match(ci, /node-version: 26/);
   assert.match(text(path.join(ROOT, 'LICENSE')), /^MIT License[\s\S]*privilege-bedrock-assume-role-LAB contributors/);

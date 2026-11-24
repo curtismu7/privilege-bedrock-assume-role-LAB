@@ -128,16 +128,17 @@ export function credentialLikeKeys(value) {
   return found.sort();
 }
 
-function summariseCall(lab, r) {
+function summariseCall(lab, r, clockMs = lab.clock().now()) {
   const auth = r.hops.find((h) => h.id === 'provider-auth');
-  return { ok: r.ok, code: r.code, hops: hopList(r), sessionAction: auth.sessionAction ?? null, spent: r.ledger.spent, requests: r.usage.requests, sessionExpiresAt: r.session ? r.session.expiresAt : null, clockMs: lab.clock().now() };
+  return { ok: r.ok, code: r.code, hops: hopList(r), sessionAction: auth.sessionAction ?? null, spent: r.ledger.spent, requests: r.usage.requests, sessionExpiresAt: r.session ? r.session.expiresAt : null, clockMs };
 }
 
 const RUNNERS = {
   call(s) {
     const lab = createLab({ key: s.key, aws: s.aws });
-    const calls = s.calls.map((c) => { if (c.advanceMs) lab.advance(c.advanceMs); return summariseCall(lab, lab.call(c.prompt)); });
-    return { calls, auditCodes: lab.audit().list().map((e) => e.code) };
+    const full = s.calls.map((c) => { if (c.advanceMs) lab.advance(c.advanceMs); return lab.call(c.prompt); });
+    const calls = full.map((r) => summariseCall(lab, r, r.clock.endedAt));
+    return { summary: { calls, auditCodes: lab.audit().list().map((e) => e.code) }, detail: { calls: full } };
   },
   'key-shape'(s) {
     const clock = createClock(0);
@@ -150,11 +151,11 @@ const RUNNERS = {
     const run = (spec) => {
       const lab = createLab({ key: spec, aws: s.aws });
       const r = lab.call(s.prompt);
-      return { hops: hopList(r), spent: r.ledger.spent, produced: { result: r, view: lab.view(), audit: lab.audit().list() } };
+      return { hops: hopList(r), spent: r.ledger.spent, call: r, produced: { result: r, view: lab.view(), audit: lab.audit().list() } };
     };
     const a = run(s.assumedKey);
     const st = run(s.storedKey);
-    return {
+    const summary = {
       storedHasCredentialField: Object.hasOwn(storedView, 'credential'),
       storedCredentialView: storedView.credential,
       storedValueLeaked: [storedView, stored, st.produced].some((x) => JSON.stringify(x).includes(s.storedKey.credential)),
@@ -164,6 +165,7 @@ const RUNNERS = {
       realLookingCredentialRefused: refuseCode(() => createKeyObject({ ...s.storedKey, credential: 'not-a-mock-value' }, clock)),
       storedCallHops: st.hops, assumedCallHops: a.hops, storedSpent: st.spent, assumedSpent: a.spent,
     };
+    return { summary, detail: { storedView, assumedView, storedCall: st.call, assumedCall: a.call } };
   },
   'fallback-target'(s) {
     const lab = createLab({ key: s.key, aws: s.aws });
@@ -178,14 +180,16 @@ const RUNNERS = {
       reasons.push(target.ok ? 'success' : target.error);
       ok = target.ok; servedPosition = target.ok ? 1 : null;
     }
-    return {
+    const summary = {
       ok, servedPosition, reasons, targetHops: target ? target.hops.map((h) => `${h.id}:${h.status}`) : [],
       spent: lab.key().llm.ledger.spent(), requests: lab.key().llm.usage.snapshot().requests, auditCodes: lab.audit().list().map((e) => e.code), elapsedMs: clock.now(),
     };
+    const { result: targetCall, hops: _h, audit: _a, text: _t, usage: _u, ...targetAnswer } = target ?? {}; // eslint-disable-line no-unused-vars
+    return { summary, detail: { primary: { provider: first.provider, model: first.model, ok: first.ok, status: first.status, error: first.error ?? null, latencyMs: first.latencyMs }, target: target ? targetAnswer : null, targetCall: target ? targetCall : null } };
   },
   vertex(s) {
     const r = evaluateVertex({ policy: s.policy, serviceAccount: s.serviceAccount });
-    return { ok: r.ok, code: r.code };
+    return { summary: { ok: r.ok, code: r.code }, detail: { evaluation: r, policy: s.policy, serviceAccount: s.serviceAccount } };
   },
 };
 
@@ -199,11 +203,19 @@ export function checkExpectation(summary, expect) {
   return bad;
 }
 
-export function runScenario(id) {
+// `detail` is what the page draws (full call results, key views, the evaluation); the expectation is checked against the summary only.
+export function runScenarioDetailed(id) {
   const s = scenarioById(id);
   if (!s) return null;
-  const summary = RUNNERS[s.kind](s);
+  const { summary, detail } = RUNNERS[s.kind](s);
   const mismatches = checkExpectation(summary, s.expect);
-  return { id: s.id, kind: s.kind, title: s.title, summary: s.summary, expect: s.expect, pass: mismatches.length === 0, mismatches, result: summary };
+  return { id: s.id, kind: s.kind, title: s.title, summary: s.summary, expect: s.expect, pass: mismatches.length === 0, mismatches, result: summary, detail };
+}
+
+export function runScenario(id) {
+  const r = runScenarioDetailed(id);
+  if (!r) return null;
+  const { detail, ...rest } = r; // eslint-disable-line no-unused-vars
+  return rest;
 }
 

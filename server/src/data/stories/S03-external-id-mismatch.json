@@ -1,0 +1,8 @@
+{
+  "id": "S03",
+  "scenario": "external-id-mismatch",
+  "title": "The external ID does not match",
+  "goal": "The role exists and trusts the gateway, yet {{castApp}} is refused.",
+  "obstacle": "The trust policy requires one external ID and {{castKey}} carries a different one. The comparison is exact and case-sensitive.",
+  "control": "The result is External ID mismatch, with the fix: make the key's external ID equal the trust policy's value."
+}

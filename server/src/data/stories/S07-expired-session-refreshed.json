@@ -1,0 +1,8 @@
+{
+  "id": "S07",
+  "scenario": "expired-session-refreshed",
+  "title": "The session expires and is refreshed",
+  "goal": "All day, {{castApp}} keeps working for {{castTask}}.",
+  "obstacle": "A session lasts a fixed time on the lab clock, so one call will find it expired.",
+  "control": "The clock reaches the expiry exactly; the next call assumes the role again and is served as session_refreshed on a new session."
+}

@@ -44,3 +44,18 @@ test('reset script: refuses a non-loopback host; resets a running lab', async ()
     assert.deepEqual([s.key.usage.requests, s.key.budget.spent, s.key.session, s.clockMs, s.auditSize], [0, 0, null, 0, 0]);
   } finally { await lab.close(); }
 });
+
+test('reset script: takes a workspace id (argument), clears only that workspace, and refuses a malformed id', async () => {
+  const lab = await startLab();
+  try {
+    await lab.send('POST', '/api/call', { prompt: 'hello' }, { 'x-workspace': 'alpha' });
+    await lab.send('POST', '/api/call', { prompt: 'hello' });
+    const r = await reset(lab.base, 'alpha');
+    assert.equal(r.workspace, 'alpha');
+    assert.equal((await lab.get('/api/state', { 'x-workspace': 'alpha' })).json.auditSize, 0, 'alpha was reset');
+    assert.equal((await lab.get('/api/state')).json.auditSize, 1, 'the default workspace was not');
+    assert.equal((await reset(lab.base)).workspace, 'default');
+    await assert.rejects(reset(lab.base, 'Bad Id'), /workspace id must be/);
+  } finally { await lab.close(); }
+});
+

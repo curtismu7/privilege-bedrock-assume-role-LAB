@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import dns from 'node:dns';
 import net from 'node:net';
+import os from 'node:os';
 import { installNetguard, netguardSelfTest } from '../src/netguard.js';
 import { SCENARIOS, runScenario } from '../src/scenarios.js';
 import { startLab } from './helpers.js';
@@ -39,4 +41,26 @@ test('ZERO outbound attempts while every scenario runs and the whole HTTP API is
     await lab.send('POST', '/api/reset', {});
     assert.deepEqual(g.attempts, [], 'no DNS, socket, fetch or UDP attempt left this machine');
   } finally { await lab.close(); g.restore(); }
+});
+
+test('a literal IP is allowed through the guarded lookup (an opted-in bind address needs no name server) but never connected to; names are still blocked', async () => {
+  const g = installNetguard();
+  try {
+    const addr = await new Promise((res, rej) => dns.lookup('192.0.2.7', (e, a) => (e ? rej(e) : res(a))));
+    assert.equal(addr, '192.0.2.7');
+    assert.equal((await dns.promises.lookup('192.0.2.7')).address, '192.0.2.7');
+    assert.deepEqual(g.attempts, [], 'a literal IP lookup is not an outbound attempt');
+    await assert.rejects(new Promise((_, rej) => { try { const s = net.connect({ host: '192.0.2.7', port: 80 }); s.on('error', rej); } catch (e) { rej(e); } }), /network blocked/);
+    assert.deepEqual(g.attempts, ['socket:192.0.2.7'], 'connecting to it is still refused and recorded');
+    await assert.rejects(dns.promises.lookup('some-name.invalid'), /network blocked/);
+    g.attempts.length = 0;
+    // and a server can bind a non-loopback address of this machine when the bind is opted in
+    const iface = Object.values(os.networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal);
+    if (iface) {
+      const srv = net.createServer();
+      await new Promise((res, rej) => { srv.once('error', rej); srv.listen(0, iface.address, res); });
+      srv.close();
+      assert.deepEqual(g.attempts, [], 'binding a literal non-loopback IP is not an outbound attempt');
+    }
+  } finally { g.restore(); }
 });

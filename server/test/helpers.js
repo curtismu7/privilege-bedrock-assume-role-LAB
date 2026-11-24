@@ -1,10 +1,19 @@
 import { createApp, startHttpServer } from '../src/app.js';
 import { createHealth } from '../src/health.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { validateConfig } from '../src/customer.js';
 
-// A running app on an ephemeral loopback port with a quiet health timer. Returns { base, get, send, close }.
-export async function startLab() {
+// The tests never depend on a web build: unless a test opts in with its own distDir, the page directory is one that does not exist, so GET / is the API's JSON 404
+// whether or not web/dist has been built on this machine.
+const NO_DIST = path.join(os.tmpdir(), `pba-no-dist-${process.pid}`);
+fs.rmSync(NO_DIST, { recursive: true, force: true });
+
+// A running app (the default customer config, never the author's own file) on an ephemeral loopback port with a quiet health timer and no stdout lines (pass `log` to capture them). Returns { base, get, send, close }.
+export async function startLab({ log = () => {}, now, distDir, customer } = {}) {
   const health = createHealth({ demoId: 'test', demoName: 'test', runChecks: () => [], allPassed: () => true, intervalMs: 3_600_000 });
-  const { server, url } = await startHttpServer({ port: 0, host: '127.0.0.1', app: createApp({ health }) });
+  const { server, url } = await startHttpServer({ port: 0, host: '127.0.0.1', app: createApp({ health, log, ...(now ? { now } : {}), distDir: distDir ?? NO_DIST, customer: customer ?? validateConfig({}) }) });
   const base = url.replace(/\/$/, '');
   const call = async (method, path, body, headers = {}) => {
     const res = await fetch(`${base}${path}`, {

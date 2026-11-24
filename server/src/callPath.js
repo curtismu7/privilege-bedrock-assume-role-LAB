@@ -4,7 +4,7 @@
 // Every hop is always listed, with status done | failed | skipped, so a failure shows exactly where the call stopped and what did not run.
 // Deterministic: no network, no randomness, time only from the lab clock. The ORDER of the hops and the refused-call audit are this lab's model (UNVERIFIED).
 import { evaluateWithRefresh } from './iamEvaluator.js';
-import { externalIdFor, hasStoredCredential } from './keyModes.js';
+import { externalIdFor, hasExternalId, hasStoredCredential } from './keyModes.js';
 import { GATEWAY_PRINCIPAL, GUARD_BLOCK_MARKER } from './data.js';
 
 export const HOP_IDS = Object.freeze(['key', 'ai-guard', 'provider-auth', 'bedrock-invoke', 'metering', 'audit']);
@@ -90,7 +90,7 @@ export function callThroughKey(key, ctx) {
     else if (evaluation.afterExpiry || evaluation.code === 'session_expired') key.session = null;
     const authFailed = !evaluation.ok && AUTH_STAGES.has(evaluation.stage);
     hops.push(hop('provider-auth', authFailed ? 'failed' : 'done', {
-      method: 'assume-role', roleArn: key.roleArn, sessionAction: evaluation.sessionAction, session: key.session ? { ...key.session } : null,
+      method: 'assume-role', roleArn: key.roleArn, externalIdSent: hasExternalId(key), sessionAction: evaluation.sessionAction, session: key.session ? { ...key.session } : null,
       result: authFailed ? evaluation.code : 'assumed',
     }));
     if (authFailed) return finish(false, evaluation.code, { evaluation });

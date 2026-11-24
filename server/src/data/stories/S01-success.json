@@ -1,0 +1,8 @@
+{
+  "id": "S01",
+  "scenario": "success",
+  "title": "The role is assumed and the call is served",
+  "goal": "For {{castBrand}}, {{castApp}} reaches Bedrock for {{castTask}} without a cloud credential stored on {{castKey}}.",
+  "obstacle": "Storing a long-lived cloud credential on a key is the risk the team wants to avoid.",
+  "control": "The key names a role. The gateway assumes it, the call is served, and the trace still shows the guard, metering and audit hops, all done."
+}

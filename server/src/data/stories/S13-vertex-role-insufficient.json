@@ -1,0 +1,8 @@
+{
+  "id": "S13",
+  "scenario": "vertex-role-insufficient",
+  "title": "Vertex AI: a role that does not grant the call",
+  "goal": "The service account is bound, and the call is still refused.",
+  "obstacle": "It is bound only to a viewer role, which does not grant predict.",
+  "control": "The result is Role does not grant the call, a different result from having no role at all."
+}

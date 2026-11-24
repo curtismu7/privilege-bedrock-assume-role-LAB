@@ -1,0 +1,8 @@
+{
+  "id": "S05",
+  "scenario": "missing-invoke-permission",
+  "title": "The role cannot invoke the model",
+  "goal": "The role is assumed but {{castApp}} still cannot answer {{castTask}}.",
+  "obstacle": "The role's permission policy allows another Bedrock action, not the invoke.",
+  "control": "The trace shows the assume succeeded and the invoke failed. The fix is to allow the invoke on the model for {{castOwner}}'s role."
+}

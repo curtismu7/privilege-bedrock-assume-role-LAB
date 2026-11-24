@@ -1,0 +1,8 @@
+{
+  "id": "S02",
+  "scenario": "wrong-trust-principal",
+  "title": "The trust policy names someone else",
+  "goal": "The role exists, created by {{castOwner}}, but the call is refused.",
+  "obstacle": "The role's trust policy names a different principal than the one the gateway presents, so the role is never assumed.",
+  "control": "The result is named: Wrong trust principal, with its fix. Nothing is invoked or metered and the refusal is audited."
+}

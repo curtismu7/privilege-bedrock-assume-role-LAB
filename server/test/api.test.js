@@ -296,3 +296,14 @@ test('error messages never echo the caller\'s text', async () => {
     assert.doesNotMatch(r7.text, /zz-secret-marker/);
   } finally { await lab.close(); }
 });
+
+test('HEAD is allowed wherever GET is (and is named in Allow); a write route still refuses it', async () => {
+  const lab = await startLab();
+  try {
+    for (const p of ['/api/info', '/api/state', '/api/scenarios', '/api/mode', '/api/key-shapes', '/api/story', '/api/diagram', '/api/log']) assert.equal((await lab.send('HEAD', p)).status, 200, p);
+    const wrong = await lab.send('POST', '/api/info', {});
+    assert.equal(wrong.status, 405); assert.equal(wrong.headers.get('allow'), 'GET, HEAD');
+    assert.equal((await lab.send('HEAD', '/api/call')).status, 405);
+    assert.equal((await lab.send('HEAD', '/api/call')).headers.get('allow'), 'POST');
+  } finally { await lab.close(); }
+});

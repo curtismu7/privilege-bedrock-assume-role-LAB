@@ -61,3 +61,47 @@ export const permissionPolicy = ({ action = 'bedrock:InvokeModel', resource = 'a
   Statement: [{ Sid: 'AllowInvoke', Effect: 'Allow', Action: action, Resource: resource }],
 });
 export const DEFAULT_AWS = () => clone({ trust: trustPolicy(), permission: permissionPolicy() });
+
+// The Limits page: exactly what the release notes say, what is this lab's own model, and what is not claimed. The one place these are written.
+export const SOURCED = Object.freeze([
+  `An LLM key can reach Bedrock under an assumed IAM role (${RELEASE_NOTES_DATE} release notes).`,
+  'No provider credential is stored on the key.',
+  'Metering, AI Guard and audit stay intact on the call.',
+  'The same route also works as a fallback target.',
+  'Vertex service accounts are the sibling feature in the same release bullet.',
+]);
+
+export const LAB_MODEL = Object.freeze([
+  'An assumed-role key names a role and an optional external ID and holds no credential field of any kind; a stored-credential key holds a write-only MOCK- placeholder that is never returned or logged.',
+  'A call always lists six hops: key, ai-guard, provider-auth, bedrock-invoke, metering, audit. Each is done, failed or skipped, so a failure shows where the call stopped. The guard runs before the role is assumed.',
+  'The evaluator reads a trust policy (an Allow must name the caller, a Deny wins, an optional sts:ExternalId equals condition, compared exactly), then the session, then the permission policy (bedrock:InvokeModel on the model\'s ARN), then the lab\'s model-access table for the region.',
+  'A new session lasts 3600000 ms on the lab clock. A held session is reused until the clock reaches its expiry exactly; the trust policy is not consulted while it is valid. An expired session is refreshed by assuming the role again.',
+  'Policy JSON is data only: at most 10000 characters, depth 8, 600 values and 20 statements; anything the lab does not read is refused as unsupported, never ignored.',
+  'Every call, served or refused, writes an audit entry (ids, outcome, lab time; never the prompt, an external ID or a credential).',
+  'The Vertex tab models the gateway\'s own service account: it needs a binding to a role that grants aiplatform.endpoints.predict (the lab grants it to roles/aiplatform.user and roles/aiplatform.admin only).',
+  'Tokens are counted as input words plus a fixed 120-token reply; the key has its own budget.',
+]);
+
+export const NOT_CLAIMED = Object.freeze([
+  'Whether a gateway\'s own rate-limit refusal can trigger a fallback. This is an open question and the lab shows no opinion on it (owner decision 2026-11-24).',
+  'Identity-side permissions, service control policies and permission boundaries are not modelled.',
+]);
+
+// Copy-paste IAM examples. PLACEHOLDER ids only: made-up account ids, names starting "example", the placeholder external ID. Never paste a real one.
+export const IAM_SNIPPETS = Object.freeze([
+  { id: 'trust', title: 'Trust policy (who may assume the role)', language: 'json', text: JSON.stringify(trustPolicy(), null, 2) },
+  { id: 'permission', title: 'Permission policy (what the role may do)', language: 'json', text: JSON.stringify(permissionPolicy(), null, 2) },
+  {
+    id: 'cli', title: 'Create the role (placeholder names; run in an account you control)', language: 'sh',
+    text: [
+      'aws iam create-role --role-name example-bedrock-invoke-role \\',
+      '  --assume-role-policy-document file://trust-policy.json',
+      'aws iam put-role-policy --role-name example-bedrock-invoke-role \\',
+      '  --policy-name example-bedrock-invoke --policy-document file://permission-policy.json',
+    ].join('\n'),
+  },
+  {
+    id: 'vertex', title: 'Vertex AI binding (the gateway\'s own service account)', language: 'json',
+    text: JSON.stringify({ bindings: [{ role: 'roles/aiplatform.user', members: [`serviceAccount:${VERTEX_SERVICE_ACCOUNT}`] }] }, null, 2),
+  },
+]);

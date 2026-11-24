@@ -48,10 +48,11 @@ export function installNetguard() {
     if (!mayLeave(host)) { attempts.push(`socket:${host}`); throw new Error(`network blocked: ${host}`); }
     return real.connect.apply(this, args);
   };
+  // listen() resolves its bind address through lookup. A wildcard bind (a container's 0.0.0.0 bind) and a literal IP (an opted-in PBA_BIND address) need no
+  // name server and are not outbound; connecting to them is still refused by the socket guard above, so only the lookup is allowed.
+  const bindOnly = (h) => h === '0.0.0.0' || h === '::' || (typeof h === 'string' && net.isIP(h) !== 0);
   dns.lookup = function guardedLookup(host, ...rest) {
-    // listen() resolves its bind address through lookup. A wildcard bind (a container's 0.0.0.0 bind) is not outbound,
-    // and connecting to it is still refused by the socket guard above, so only the lookup is allowed.
-    if (!mayLeave(host) && host !== '0.0.0.0' && host !== '::') {
+    if (!mayLeave(host) && !bindOnly(host)) {
       attempts.push(`dns:${host}`);
       const cb = rest.find((r) => typeof r === 'function');
       return cb?.(new Error(`network blocked: ${host}`));
@@ -59,7 +60,7 @@ export function installNetguard() {
     return real.lookup.call(dns, host, ...rest);
   };
   dns.promises.lookup = async function guardedPromiseLookup(host, ...rest) {
-    if (!mayLeave(host) && host !== '0.0.0.0' && host !== '::') { attempts.push(`dns:${host}`); throw new Error(`network blocked: ${host}`); }
+    if (!mayLeave(host) && !bindOnly(host)) { attempts.push(`dns:${host}`); throw new Error(`network blocked: ${host}`); }
     return real.plookup.call(dns.promises, host, ...rest);
   };
   globalThis.fetch = async function guardedFetch(input, init) {
