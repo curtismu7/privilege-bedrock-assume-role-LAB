@@ -72,6 +72,23 @@ describe("Assumed role page: scenarios", () => {
   });
 });
 
+describe("Assumed role page: hop strip labels", () => {
+  it("the key-shape scenario labels its two strips with the key each call used (as the server trace does); other multi-call runs say Call n of m; a single call has no label", async () => {
+    const user = await h.mount();
+    await user.click(await screen.findByTestId("scenario-stored-vs-assumed-key-shape"));
+    await screen.findByTestId("verdict");
+    const titles = () => within(screen.getByTestId("call-path")).getAllByTestId("hop-strip").map((s) => s.querySelector(".hops__title")?.textContent ?? null);
+    expect(titles()).toEqual(["Stored-credential key", "Assumed-role key"]);
+    await screen.findByTestId("ro-table");
+    const trace = screen.getByTestId("gateway-trace").textContent;
+    expect(trace).toMatch(/Stored-credential key: App to gateway/); expect(trace).toMatch(/Assumed-role key: App to gateway/);
+    await user.click(screen.getByTestId("scenario-expired-session-refreshed"));
+    await waitFor(() => expect(titles()).toEqual(["Call 1 of 2", "Call 2 of 2"]));
+    await user.click(screen.getByTestId("scenario-success"));
+    await waitFor(() => expect(titles()).toEqual([null]));
+  });
+});
+
 describe("Assumed role page: the key", () => {
   it("shows the stored key and the assumed-role key side by side: a masked credential entry on one, no credential entry on the other", async () => {
     await h.mount();

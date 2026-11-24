@@ -106,7 +106,7 @@ export function createApp({
     const baseMs = now();
     const events = eventsFor(items, { baseMs });
     for (const e of events) log(decisionLine(e, runId));
-    ws.lastRun = { id: runId, startedAt: new Date(baseMs).toISOString(), endedAt: new Date(baseMs + durationMs(items)).toISOString(), events, kind, scenarioId };
+    ws.lastRun = { id: runId, startedAt: new Date(baseMs).toISOString(), endedAt: new Date(baseMs + durationMs(items)).toISOString(), events, items, kind, scenarioId };
     ws.log = [{ runId, at: ws.lastRun.startedAt, kind, scenarioId, ok, code }, ...ws.log].slice(0, MAX_RUNS);
     return { runId, trace: { exchanges: exchangesFor(items, { prompt }) } };
   }

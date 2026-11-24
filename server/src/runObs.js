@@ -87,22 +87,43 @@ export function eventsFor(items, { baseMs }) {
 const WHY = {
   person: 'This lab has no signed-in person: the key belongs to an app.',
   gateway: 'This lab has no separate agent gateway hop. The lab model of the LLM gateway is shown under Privilege.',
-  agent: 'No call was made.', privilege: 'No call was made.', authorize: 'No role or service account was checked in this run (a stored-credential key assumes no role).',
-  resource: 'No model was called in this run (the call stopped before the mock Bedrock).',
+  agent: 'No call was made.', privilege: 'No call was made.',
 };
+
+// The reason an EMPTY layer gives is built from the run, so it never names a mechanism that did not happen (a stored-credential key in a run that used none,
+// the mock Bedrock in a Vertex run). A run is a list of items (see itemsFor); with no items it says nothing about why.
+const modeOf = (call) => call.hops.find((h) => h.id === 'key')?.mode;
+function whyEmpty(layer, items) {
+  const calls = items.filter((i) => i.type === 'call').map((i) => i.call);
+  const vertex = items.some((i) => i.type === 'vertex');
+  if (layer === 'authorize') {
+    if (calls.length > 0 && calls.every((c) => modeOf(c) === 'stored-credential')) return 'This run used a stored-credential key: no role is assumed, so there was no IAM decision to log.';
+    if (calls.some((c) => modeOf(c) === 'assumed-role' && c.code === 'guard_blocked')) return 'The AI Guard stub blocked the call before any role was assumed, so there was no IAM decision to log.';
+    return 'No role or service account was checked in this run.';
+  }
+  if (layer === 'resource') {
+    if (vertex && calls.length === 0) return 'No model was called in this run: it checked the gateway\'s service account against the Vertex AI policy only.';
+    const last = calls.at(-1);
+    if (last?.code === 'guard_blocked') return 'No model was called in this run: the AI Guard stub blocked the call.';
+    if (last?.code === 'out_of_budget') return 'No model was called in this run: the key\'s own budget could not cover it.';
+    if (last && !last.ok) return 'No model was called in this run: the call was refused before the mock Bedrock (the role was not assumed, or the invoke was refused).';
+    return 'No model was called in this run.';
+  }
+  return WHY[layer];
+}
 const PRODUCT = { agent: 'lab mock app', privilege: 'lab mock LLM gateway', authorize: 'lab mock IAM', resource: 'lab mock Bedrock' };
 
-export function mockLayers(events) {
+export function mockLayers(events, items = []) {
   return LAYERS.map((layer) => ({
-    layer, products: [], reason: WHY[layer],
+    layer, products: [], reason: whyEmpty(layer, items),
     simulated: events.filter((e) => e.layer === layer).map((e) => ({ at: e.at, product: PRODUCT[layer], outcome: e.outcome, message: e.message, detail: e.detail })),
   }));
 }
 
-// run: { id, startedAt (ISO), endedAt (ISO), events }.
+// run: { id, startedAt (ISO), endedAt (ISO), events, items }.
 export async function buildRunRecord(run, { clock = Date.now } = {}) {
   if (!run) return null;
-  return createRunObservability({ clock }).collectRun({ runId: run.id, startedAt: run.startedAt, endedAt: run.endedAt, source: 'mock', layers: mockLayers(run.events) });
+  return createRunObservability({ clock }).collectRun({ runId: run.id, startedAt: run.startedAt, endedAt: run.endedAt, source: 'mock', layers: mockLayers(run.events, run.items ?? []) });
 }
 
 // Where a run leaves logs and where they could stream (rule 27: the README says the same). The lab reads no log and claims no product logged anything.

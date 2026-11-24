@@ -136,7 +136,7 @@ export default function Result({ last, obs, source, page }) {
       {d.calls.length > 0 && (
         <section className="card card--neutral" data-testid="call-path" aria-label="Call path">
           <p className="kicker">The call path: six hops, every one listed</p>
-          {d.calls.map((c, i) => <HopStrip key={i} call={c} label={label(d.calls.length, i) || (last.kind === "scenario" && d.keyShape ? (i === 0 ? "Stored-credential key" : "Assumed-role key") : null)} />)}
+          {d.calls.map((c, i) => <HopStrip key={i} call={c} label={d.keyShape ? (i === 0 ? "Stored-credential key" : "Assumed-role key") : label(d.calls.length, i)} />)}
           <p className="muted">A failed or not-reached hop shows where the call stopped. Metering, the AI Guard step and the audit entry are on the call for both key modes.</p>
         </section>
       )}

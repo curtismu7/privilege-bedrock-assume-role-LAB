@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { assertRunObservability, LAYERS, classify, defaultLayers } from '../src/runObservability.js';
 import { buildRunRecord, decisionLine, durationMs, eventsFor, itemsFor, mockLayers } from '../src/runObs.js';
 import { SCENARIOS, runScenarioDetailed } from '../src/scenarios.js';
+import { createLab } from '../src/lab.js';
+import { DEFAULT_PROMPT } from '../src/data.js';
 import { startLab } from './helpers.js';
 
 const BASE = Date.parse('2026-11-24T10:00:00.000Z');
@@ -12,7 +14,7 @@ const recordFor = async (id) => {
   const out = runScenarioDetailed(id);
   const items = itemsFor(out.kind, out.detail);
   const events = eventsFor(items, { baseMs: BASE });
-  const run = { id: 'run-1', startedAt: new Date(BASE).toISOString(), endedAt: new Date(BASE + durationMs(items)).toISOString(), events };
+  const run = { id: 'run-1', startedAt: new Date(BASE).toISOString(), endedAt: new Date(BASE + durationMs(items)).toISOString(), events, items };
   return { record: await buildRunRecord(run, { clock: () => BASE }), events, out, items };
 };
 
@@ -133,4 +135,34 @@ test('the run log is bounded', async () => {
     assert.equal((await lab.get('/api/log')).json.runs.length, 20);
     assert.equal((await lab.get('/api/log')).json.runs[0].runId, 'run-25');
   } finally { await lab.close(); }
+});
+
+test('an empty layer gives a reason built from the run: it names no mechanism that did not happen', async () => {
+  const reasons = async (id) => (await recordFor(id)).record.reasons;
+  const vertex = await reasons('vertex-with-role');
+  assert.match(vertex.resource, /Vertex AI policy/); assert.doesNotMatch(vertex.resource, /mock Bedrock|stopped before/);
+  const guard = await reasons('guard-still-applies');
+  assert.match(guard.authorize, /AI Guard stub blocked the call before any role was assumed/); assert.doesNotMatch(guard.authorize, /stored-credential/);
+  assert.match(guard.resource, /AI Guard stub blocked the call/); assert.doesNotMatch(guard.resource, /mock Bedrock/);
+  const refused = await reasons('wrong-trust-principal');
+  assert.match(refused.resource, /refused before the mock Bedrock/);
+  // a stored-credential run: its Authorize layer says so
+  const lab = createLab({ key: { mode: 'stored-credential', credential: 'MOCK-reason-0001' } });
+  const call = lab.call(DEFAULT_PROMPT);
+  const items = itemsFor('call', { calls: [call] });
+  const rec = await buildRunRecord({ id: 'run-1', startedAt: new Date(BASE).toISOString(), endedAt: new Date(BASE).toISOString(), events: eventsFor(items, { baseMs: BASE }), items }, { clock: () => BASE });
+  assert.match(rec.reasons.authorize, /stored-credential key: no role is assumed/);
+  assert.equal(rec.reasons.resource, undefined, 'the call reached the mock Bedrock, so that layer has rows and needs no reason');
+  // the same layer for an assumed-role run never says stored-credential
+  const lab2 = createLab(); const call2 = lab2.call(`please ${'[[guard-block]]'}`);
+  const items2 = itemsFor('call', { calls: [call2] });
+  const rec2 = await buildRunRecord({ id: 'run-2', startedAt: new Date(BASE).toISOString(), endedAt: new Date(BASE).toISOString(), events: eventsFor(items2, { baseMs: BASE }), items: items2 }, { clock: () => BASE });
+  assert.doesNotMatch(rec2.reasons.authorize, /stored-credential/);
+  // through the API the live record carries the same reasons
+  const api = await startLab();
+  try {
+    await api.send('POST', '/api/call', { prompt: 'x [[guard-block]]' });
+    const j = (await api.get('/api/run-observability')).json;
+    assert.match(j.record.reasons.authorize, /AI Guard stub blocked/);
+  } finally { await api.close(); }
 });
