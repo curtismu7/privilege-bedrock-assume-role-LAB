@@ -1,0 +1,20 @@
+{
+  "name": "privilege-bedrock-assume-role-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Privilege Bedrock assume-role LAB: an LLM key that stores no cloud credential reaches Bedrock under an assumed IAM role, with metering, AI Guard and audit still on the call; plus a Vertex service-account tab. Mock IAM evaluator on a lab clock; no network. Step 1: engine and server API.",
+  "license": "MIT",
+  "workspaces": [
+    "server"
+  ],
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "start": "npm start -w server",
+    "test": "npm test -w server",
+    "doctor": "node scripts/doctor.mjs",
+    "reset": "node scripts/reset.mjs"
+  }
+}

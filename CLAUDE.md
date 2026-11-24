@@ -1,0 +1,8 @@
+# privilege-bedrock-assume-role-LAB
+
+Demo-tier standalone lab, step 1 (engine + API only). Port **7838 PROVISIONAL, not claimed**. Spec: `docs/spec.md`. Source of claims: the 2026-11-21 release notes only; everything else is UNVERIFIED (lab model) and the banner (`server/src/data.js`) says so. Never present anything here as a Ping, AWS or Google statement.
+
+- Run `npm start`; test `npm test` (glob); preflight `npm run doctor`; reset `npm run reset`. Node 26. Tests go to the Air: `air-test . -- npm test`.
+- Core: `iamEvaluator.js` (pure, total evaluator), `policy.js` + `glob.js` (policy as bounded data), `vertexEvaluator.js`, `keyModes.js` (two key modes), `callPath.js` (six hops, fallback-target export), `lab.js` (state), `scenarios.js` (data with hand-written expectations), `app.js` (one `ROUTES` table), `doctor.js` (one check per scenario), `netguard.js`, `safety.js`.
+- Rules that bite: Mock only, zero outbound (netguard + test). `server/src/model-gateway-sim/` and `health.js` are vendored byte for byte, never edited (pin test + doctor). An assumed-role key has NO credential field, in any view, at any depth; a stored credential is `MOCK-` only, write-only, never returned or logged. Policy JSON is never evaluated as code (no eval, Function, vm; a static test scans). A bad policy is a named result, never a pass. Placeholder ids only (account ids in the test allowlist, `.example` hosts). The static scans skip `.github/` and the shared attribution script. No AI attribution in commits or files.
+- Not built yet: web UI (banner, toggle, GatewayTrace, JsonPane, diagram, presenter mode, talk track), Dockerfile/compose, shelf entry, content pack, stories, Real mode.
