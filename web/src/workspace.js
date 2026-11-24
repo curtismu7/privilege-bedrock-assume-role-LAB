@@ -21,30 +21,29 @@ export function workspaceId() {
   return memo;
 }
 
-// The server says on every workspace route whether THIS request created the workspace (X-Workspace-Fresh: 1) or not (0). A tab that has already used its id and
-// gets a 1 was forgotten (evicted at the cap, reset by someone else, or the server restarted): its lab is back at its defaults. That is announced once, as an event
-// the app turns into a plain banner. The visitor's own Reset also makes the next request fresh, so Reset says so first (expectFresh).
+// FORGOTTEN WORKSPACE. A tab that has already used its workspace id says so on every request it sends (X-Workspace-Seen: 1, decided when the request is SENT). If the
+// server then has to create the workspace for such a request (it was evicted at the cap, or the server restarted) it answers X-Workspace-Forgotten: 1, once: the lab is
+// back at its defaults. That is announced as an event the app turns into a plain banner. The decision never depends on the order responses arrive in: the first
+// requests of a brand-new tab all go out before any answer is back, so none of them says "seen". The visitor's own Reset is not "forgotten" (the server starts the
+// workspace again as part of the Reset). The headers are read on every status, a 400 included.
 const USED = "pba.workspace.used";
 export const WORKSPACE_FORGOTTEN = "workspace:forgotten";
-let expectFresh = false;
-const used = () => { try { return window.sessionStorage.getItem(USED) === "1"; } catch { return usedMemo; } };
 let usedMemo = false;
+const used = () => { try { return window.sessionStorage.getItem(USED) === "1" || usedMemo; } catch { return usedMemo; } };
 const markUsed = () => { usedMemo = true; try { window.sessionStorage.setItem(USED, "1"); } catch { /* blocked: the in-memory flag stands */ } };
-export const expectForgetting = () => { expectFresh = true; };
-export function noteFresh(header) {
-  if (header === null || header === undefined) return; // a route with no workspace
-  if (header === "1") {
-    if (expectFresh) expectFresh = false;
-    else if (used()) window.dispatchEvent(new Event(WORKSPACE_FORGOTTEN));
-  }
+// fresh: the X-Workspace-Fresh value (null on a route with no workspace); forgotten: the X-Workspace-Forgotten value.
+export function noteWorkspaceHeaders(fresh, forgotten) {
+  if (fresh === null || fresh === undefined) return;
+  if (forgotten === "1") window.dispatchEvent(new Event(WORKSPACE_FORGOTTEN));
   markUsed();
 }
 
 export async function workspaceFetch(url, opts = {}) {
-  const r = await fetch(url, { ...opts, headers: { "content-type": "application/json", ...(opts.headers || {}), "x-workspace": workspaceId() } });
-  noteFresh(r.headers?.get?.("x-workspace-fresh") ?? null);
+  const seen = used() ? { "x-workspace-seen": "1" } : {};
+  const r = await fetch(url, { ...opts, headers: { "content-type": "application/json", ...(opts.headers || {}), ...seen, "x-workspace": workspaceId() } });
+  noteWorkspaceHeaders(r.headers?.get?.("x-workspace-fresh") ?? null, r.headers?.get?.("x-workspace-forgotten") ?? null);
   return r;
 }
 
 // For tests: a new tab starts with a new id.
-export function forgetWorkspace() { memo = null; usedMemo = false; expectFresh = false; try { window.sessionStorage.removeItem(KEY); window.sessionStorage.removeItem(USED); } catch { /* blocked */ } }
+export function forgetWorkspace() { memo = null; usedMemo = false; try { window.sessionStorage.removeItem(KEY); window.sessionStorage.removeItem(USED); } catch { /* blocked */ } }

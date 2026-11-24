@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import TalkTrackDialog from "./talk-track/TalkTrackDialog.jsx";
 import AboutDialog from "./about/AboutDialog.jsx";
@@ -59,7 +59,11 @@ export default function App() {
 
   useEffect(() => { if (theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => { applyFontSize(fontStep); try { localStorage.setItem(FONT_KEY, fontStep); } catch { /* not remembered */ } }, [fontStep]);
-  useEffect(() => { const on = () => { setForgotten(true); lab.startOver(); }; window.addEventListener(WORKSPACE_FORGOTTEN, on); return () => window.removeEventListener(WORKSPACE_FORGOTTEN, on); }, [lab.startOver]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A scenario in the address ("#assumed-role/<id>") would run again when the page remounts: Reset, a mode switch, a new vertical and a forgotten workspace leave only the page.
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const clearScenarioHash = () => { try { window.history.replaceState(null, "", `#${pageRef.current}`); } catch { /* ignore */ } };
+  useEffect(() => { const on = () => { clearScenarioHash(); setForgotten(true); lab.startOver(); }; window.addEventListener(WORKSPACE_FORGOTTEN, on); return () => window.removeEventListener(WORKSPACE_FORGOTTEN, on); }, [lab.startOver]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const on = () => setPage(pageFromHash()); window.addEventListener("hashchange", on); return () => window.removeEventListener("hashchange", on); }, []);
   useEffect(() => {
     const on = (e) => {
@@ -72,8 +76,6 @@ export default function App() {
 
   const pickTheme = (next) => { try { if (next === "auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, next); } catch { /* not remembered */ } setTheme(next); };
   const select = (id) => { setPage(id); try { window.history.replaceState(null, "", `#${id}`); } catch { /* ignore */ } };
-  // A scenario in the address ("#assumed-role/<id>") would run again when the page remounts: Reset, a mode switch and a new vertical leave only the page.
-  const clearScenarioHash = () => { try { window.history.replaceState(null, "", `#${page}`); } catch { /* ignore */ } };
   const reset = async () => {
     // The shared TopMenu has no way to disable its Reset button, so while a run is in flight Reset says so instead (a run that finishes after a Reset is dropped anyway).
     if (lab.busy) { setResetMsg("A run is in progress: Reset again when it has finished."); return; }

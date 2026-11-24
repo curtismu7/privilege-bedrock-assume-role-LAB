@@ -56,20 +56,53 @@ test('a malformed X-Workspace is a 400 with a message, never silently the defaul
   } finally { await lab.close(); }
 });
 
-test('X-Workspace-Fresh: 1 on the request that CREATES a workspace (a new tab, or one forgotten at the cap or by a reset), 0 after; routes with no workspace carry none', async () => {
+test('X-Workspace-Fresh: 1 on the request that CREATES a workspace; X-Workspace-Forgotten: 1 only when the tab said it had used the id (X-Workspace-Seen); routes with no workspace carry none', async () => {
   const lab = await startLab();
   try {
-    const w = (id) => ({ 'x-workspace': id });
-    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '1');
-    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '0');
+    const w = (id, seen) => ({ 'x-workspace': id, ...(seen ? { 'x-workspace-seen': '1' } : {}) });
+    const first = await lab.get('/api/state', w('tab-a'));
+    assert.deepEqual([first.headers.get('x-workspace-fresh'), first.headers.get('x-workspace-forgotten')], ['1', null], 'a brand-new tab: created, not forgotten');
+    assert.deepEqual([(await lab.get('/api/state', w('tab-a', true))).headers.get('x-workspace-fresh'), 0], ['0', 0]);
     assert.equal((await lab.get('/api/info', w('tab-a'))).headers.get('x-workspace-fresh'), null);
     assert.equal((await lab.get('/api/state')).headers.get('x-workspace-fresh'), '1', 'the default workspace is created on first use too');
-    await lab.send('POST', '/api/reset', {}, w('tab-a'));
-    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '1', 'forgotten by a reset: created again');
-    // evicted at the cap: tab-a is the least recently used of 20 others, a 21st tab pushes it out
+    // a reset starts the workspace again at once: the tab that reset it is never told it was forgotten
+    const r = await lab.send('POST', '/api/reset', {}, w('tab-a', true));
+    assert.equal(r.json.workspace, 'tab-a'); assert.equal(r.headers.get('x-workspace-fresh'), null);
+    const after = await lab.get('/api/state', w('tab-a', true));
+    assert.deepEqual([after.headers.get('x-workspace-fresh'), after.headers.get('x-workspace-forgotten')], ['0', null]);
+    // evicted at the cap: tab-a is the least recently used of 20 others, a 21st pushes it out
     for (let i = 0; i < MAX_WORKSPACES; i++) await lab.get('/api/state', w(`other-${i}`));
-    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '1', 'evicted at the cap: created again, with its defaults');
-    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '0');
+    const gone = await lab.get('/api/state', w('tab-a', true));
+    assert.deepEqual([gone.headers.get('x-workspace-fresh'), gone.headers.get('x-workspace-forgotten')], ['1', '1'], 'evicted: created again for a tab that had used it');
+    const again = await lab.get('/api/state', w('tab-a', true));
+    assert.deepEqual([again.headers.get('x-workspace-fresh'), again.headers.get('x-workspace-forgotten')], ['0', null], 'said once');
+    // a Reset of an already-forgotten workspace is not "forgotten" either
+    for (let i = 0; i < MAX_WORKSPACES; i++) await lab.get('/api/state', w(`more-${i}`));
+    await lab.send('POST', '/api/reset', {}, w('tab-a', true));
+    const post = await lab.get('/api/state', w('tab-a', true));
+    assert.deepEqual([post.headers.get('x-workspace-fresh'), post.headers.get('x-workspace-forgotten')], ['0', null]);
+  } finally { await lab.close(); }
+});
+
+test('a request that will be refused (400, 404, bad key, bad prompt, unknown scenario) validates BEFORE the workspace is touched: it creates nothing and evicts nobody', async () => {
+  const lab = await startLab();
+  try {
+    const w = (id) => ({ 'x-workspace': id, 'x-workspace-seen': '1' });
+    for (let i = 0; i < MAX_WORKSPACES; i++) await lab.get('/api/state', w(`keep-${i}`));
+    const refused = [
+      ['POST', '/api/call', { prompt: '' }], ['POST', '/api/call', { prompt: 'hi', key: { mode: 'nonsense' } }], ['POST', '/api/call', { prompt: 'hi', extra: 1 }],
+      ['POST', '/api/call', { prompt: 'hi', advanceMs: -1 }], ['PUT', '/api/key', { mode: 'stored-credential', credential: 'not-mock' }], ['PUT', '/api/key', {}],
+      ['POST', '/api/scenario/nope', {}],
+    ];
+    for (const [m, p, b] of refused) {
+      const r = await lab.send(m, p, b, w('newcomer'));
+      assert.ok(r.status === 400 || r.status === 404, `${m} ${p}: ${r.status}`);
+      assert.equal(r.headers.get('x-workspace-fresh'), null, `${m} ${p} touched the workspace`);
+    }
+    for (let i = 0; i < MAX_WORKSPACES; i++) assert.equal((await lab.get('/api/state', w(`keep-${i}`))).headers.get('x-workspace-fresh'), '0', `keep-${i} was evicted by a refused request`);
+    assert.equal((await lab.get('/api/state', w('newcomer'))).headers.get('x-workspace-fresh'), '1', 'the refused requests never created it');
+    // a malformed workspace id is refused before anything happens
+    assert.equal((await lab.get('/api/state', { 'x-workspace': 'Bad Id' })).status, 400);
   } finally { await lab.close(); }
 });
 

@@ -30,6 +30,8 @@ Demo-tier standalone lab, step 2 (engine, API and web UI). The repo exists (`cur
 - Before claiming a port check running containers and compose files (`docker ps`; the ap-* labs use 7839 to 7843), not only the registry.
 - A box or button wrapper only handles keys when `e.target === e.currentTarget`; an interactive control is a real `<button>`, never a `role=button` wrapper around other controls.
 - A vendored dialog must not show another lab's content: check every vendored dialog's text (the shared ReleaseNotes is another lab's; the version button opens `AboutDialog` instead, and a test fails on 'Token Workbench').
-- The server says on every workspace route whether it just created the workspace (`X-Workspace-Fresh`); a tab that already used its id and gets `1` shows the "server forgot this workspace" banner, and its own Reset announces itself first (`expectForgetting`).
+- Forgotten workspace: the tab says on each request it SENDS that it has used its id (`X-Workspace-Seen`); the server answers `X-Workspace-Forgotten: 1` only when it had to create the workspace for such a request (never from the order responses arrive in). Reset starts the workspace again at once, routes validate before touching a workspace, and the revealing request's own result is still shown (`startOver` does not bump `gen`).
 - Parsed talk-track sections are cached at load (missing file logged once); a paragraph starts only at a blank line.
 - HEAD is allowed wherever GET is; the forbidden-strings CI job is skipped for fork pull requests (no secret there).
+- Verdict wording is per namespace (`verdictFor(code, 'vertex')`): Bedrock and Vertex share the code names `success` and `bad_input` and must never share text.
+- A Retry after a failed first load still sends no `vertical`.

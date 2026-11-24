@@ -81,7 +81,7 @@ test('POST /api/scenario/:id carries a verdict and the detail the page draws; th
 });
 
 test('verdicts: every evaluator code has its wording, the codes the call path adds have theirs, an unknown code is named never blank', () => {
-  for (const code of [...Object.keys(RESULTS), ...Object.keys(VERTEX_RESULTS), 'guard_blocked', 'out_of_budget', 'budget_exceeded_after_call', 'provider_unavailable', 'provider_overloaded', 'provider_timeout']) {
+  for (const code of [...Object.keys(RESULTS), 'guard_blocked', 'out_of_budget', 'budget_exceeded_after_call', 'provider_unavailable', 'provider_overloaded', 'provider_timeout']) {
     const v = verdictFor(code);
     assert.equal(v.code, code); assert.ok(v.title && v.message, code); assert.equal(v.labText, true);
     if (!v.ok) assert.ok(v.fix, `${code} has a fix`);
@@ -101,5 +101,25 @@ test('a policy at the size limit is read; one character more is a named result; 
     assert.equal(over.code, 'trust_policy_invalid'); assert.equal(over.policyError.code, 'policy_too_large');
     err(await lab.send('POST', '/api/evaluate', { ...base, region: 'nowhere' }), 400, 'bad_input');
     assert.equal((await lab.send('POST', '/api/evaluate', { ...base, trust: 'x'.repeat(300_000) })).status, 413);
+  } finally { await lab.close(); }
+});
+
+test('verdicts keep the Bedrock and Vertex wording apart: the Vertex tab never says a role was assumed', async () => {
+  for (const code of Object.keys(VERTEX_RESULTS)) {
+    const v = verdictFor(code, 'vertex');
+    assert.equal(v.code, code); assert.equal(v.title, VERTEX_RESULTS[code].title); assert.equal(v.message, VERTEX_RESULTS[code].message);
+  }
+  assert.equal(verdictFor('success', 'vertex').title, 'Service account may call Vertex AI');
+  assert.equal(verdictFor('success').title, 'Role assumed, call allowed');
+  assert.equal(verdictFor('bad_input', 'vertex').message, VERTEX_RESULTS.bad_input.message, 'the Vertex entry is its own, even where the words happen to match');
+  assert.equal(verdictFor('vertex_role_missing').code, 'unknown', 'a Vertex code is not a Bedrock code');
+  assert.equal(verdictFor('success', 'nonsense').title, 'Role assumed, call allowed');
+  const lab = await startLab();
+  try {
+    const ok = (await lab.send('POST', '/api/scenario/vertex-with-role', {})).json;
+    assert.equal(ok.verdict.title, 'Service account may call Vertex AI');
+    assert.doesNotMatch(JSON.stringify(ok.verdict), /Role assumed|assumed the role|role was assumed/i);
+    assert.equal((await lab.send('POST', '/api/scenario/vertex-without-role', {})).json.verdict.title, 'Service account has no role');
+    assert.equal((await lab.send('POST', '/api/scenario/success', {})).json.verdict.title, 'Role assumed, call allowed');
   } finally { await lab.close(); }
 });

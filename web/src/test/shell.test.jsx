@@ -4,9 +4,9 @@ import { BANNER } from "../../../server/src/data.js";
 import { validateConfig } from "../../../server/src/customer.js";
 import { VERTICALS } from "../../../server/src/cast.js";
 import { jsonResponse } from "./harness.js";
-import { nav, screen, text, useLabHarness, waitFor, within } from "./util.jsx";
+import { nav, screen, text, useLabHarness, userEvent, waitFor, within } from "./util.jsx";
 import { isPresenterKey } from "../App.jsx";
-import { WORKSPACE_ID, fillRandom } from "../workspace.js";
+import { WORKSPACE_ID, WORKSPACE_FORGOTTEN, fillRandom, noteWorkspaceHeaders } from "../workspace.js";
 import { dialogItems } from "../talk.js";
 
 const h = useLabHarness();
@@ -233,17 +233,19 @@ describe("the version button, and a workspace the server forgot", () => {
     for (const other of [/Token Workbench/, /PingFederate/, /PingOne/, /Wrong-token/, /Real mode maturity/]) expect(document.body.textContent).not.toMatch(other);
   });
 
+  // The server forgets a tab's workspace when 20 other workspaces have been used since (here: 21 other tabs' first requests).
+  const evict = async () => { for (let i = 0; i < 21; i++) await fetch(`${h.lab.base}/api/state`, { headers: { "x-workspace": `evict-${i}` } }); };
+
   it("a tab that already used its workspace and finds it forgotten gets a plain banner and starts over; its own Reset does not", async () => {
     const user = await h.mount();
     await user.click(await screen.findByTestId("scenario-success"));
     await screen.findByTestId("verdict");
+    await screen.findByTestId("ro-table");
     expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
-    // the server forgets this tab's workspace (here: a reset from outside the page)
-    await fetch(`${h.lab.base}/api/reset`, { method: "POST", headers: { "x-workspace": h.lab.ws(), "content-type": "application/json" }, body: "{}" });
+    await evict();
     await user.click(screen.getByTestId("scenario-wrong-trust-principal"));
     const banner = await screen.findByTestId("workspace-forgotten");
     expect(banner).toHaveTextContent(/The server forgot this workspace; the lab was reset to its defaults/);
-    await screen.findByTestId("result-empty");
     await user.click(screen.getByTestId("workspace-forgotten-dismiss"));
     expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
     // the visitor's own Reset is not "forgotten"
@@ -255,6 +257,85 @@ describe("the version button, and a workspace the server forgot", () => {
     await screen.findByTestId("verdict");
     await screen.findByTestId("ro-table"); // let the call's last request finish: a late response from this test must not reach the next one
     expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
+  });
+
+  it("the request that REVEALED the forgetting is not lost: a call that really ran shows its verdict and the advance box goes back to 0", async () => {
+    const user = await h.mount();
+    await user.click(await screen.findByTestId("call"));
+    await screen.findByTestId("verdict");
+    await screen.findByTestId("ro-table");
+    await evict();
+    await user.click(screen.getByTestId("advance-10m"));
+    expect(screen.getByTestId("advance")).toHaveValue("600000");
+    await user.click(screen.getByTestId("call-advance"));
+    await screen.findByTestId("workspace-forgotten");
+    await waitFor(() => expect(text("verdict-code")).toBe("success"));
+    await waitFor(() => expect(screen.getByTestId("advance")).toHaveValue("0"));
+    await waitFor(() => expect(screen.getByTestId("clock-now")).toHaveTextContent("600400")); // the call ran on the NEW workspace: 10 minutes + 400 ms
+    await screen.findByTestId("ro-table");
+  });
+
+  it("a forgotten workspace clears the scenario from the address first, so the remount does not run it again", async () => {
+    const user = await h.mount();
+    await user.click(await screen.findByTestId("scenario-success"));
+    await screen.findByTestId("verdict");
+    await screen.findByTestId("ro-table");
+    await evict();
+    await user.click(screen.getByTestId("scenario-wrong-trust-principal"));
+    await screen.findByTestId("workspace-forgotten");
+    await waitFor(() => expect(text("verdict-code")).toBe("trust_principal_mismatch"));
+    expect(window.location.hash).toBe("#assumed-role");
+    await new Promise((r) => setTimeout(r, 200));
+    expect(h.lab.calls.filter((c) => c.path === "/api/scenario/wrong-trust-principal")).toHaveLength(1);
+    expect(h.lab.calls.filter((c) => c.path === "/api/scenario/success")).toHaveLength(1);
+    await screen.findByTestId("ro-table");
+  });
+
+  it("a Reset after the server forgot the workspace (the tab has not noticed yet) does not raise the banner either", async () => {
+    const user = await h.mount();
+    await user.click(await screen.findByTestId("scenario-success"));
+    await screen.findByTestId("verdict");
+    await screen.findByTestId("ro-table");
+    await evict();
+    await user.click(screen.getByTestId("reset"));
+    await screen.findByTestId("result-empty");
+    await user.click(await screen.findByTestId("call"));
+    await screen.findByTestId("verdict");
+    await screen.findByTestId("ro-table");
+    expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
+  });
+
+  it("detection does not depend on the order answers arrive in: a brand-new tab whose first requests run in parallel never shows the banner", async () => {
+    const slow = async (_init, _u, go) => { await new Promise((r) => setTimeout(r, 250)); return go(); };
+    await h.mount({ page: "assumed-role/success", overrides: { "/api/state": slow } });
+    await screen.findByTestId("verdict");
+    await screen.findByTestId("scenario-success");
+    await new Promise((r) => setTimeout(r, 500));
+    expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
+    const events = [];
+    const on = () => events.push("forgotten"); window.addEventListener(WORKSPACE_FORGOTTEN, on);
+    noteWorkspaceHeaders("0", null); noteWorkspaceHeaders("1", null); noteWorkspaceHeaders(null, null);
+    expect(events).toEqual([]);
+    noteWorkspaceHeaders("1", "1");
+    expect(events).toEqual(["forgotten"]);
+    window.removeEventListener(WORKSPACE_FORGOTTEN, on);
+    await screen.findByTestId("ro-table");
+  });
+
+  it("the headers are read on an error status too (a 400 that carries them is still seen)", async () => {
+    const user = await h.mount({ overrides: { "/api/scenario/success": () => new Response(JSON.stringify({ error: "x", message: "refused" }), { status: 400, headers: { "content-type": "application/json", "x-workspace-fresh": "1", "x-workspace-forgotten": "1" } }) } });
+    await user.click(await screen.findByTestId("scenario-success"));
+    expect(await screen.findByTestId("workspace-forgotten")).toBeInTheDocument();
+  });
+
+  it("a failed first load and a Retry ask for NO vertical, so the configured customer vertical arrives", async () => {
+    let n = 0;
+    await h.mount({ customer: validateConfig({ vertical: "health", cast: { brand: "Test Brand Co" } }), overrides: { "/api/story": async (_i, _u, go) => (++n === 1 ? jsonResponse(502, { error: "bad_gateway", message: "down" }) : go()) } }).catch(() => {});
+    await userEvent.setup().click(await screen.findByTestId("retry"));
+    await waitFor(() => expect(document.querySelector("[data-testid='mode']")).toBeTruthy());
+    const stories = h.lab.calls.filter((c) => c.path === "/api/story");
+    expect(stories.map((c) => c.search)).toEqual(["", ""]);
+    expect(screen.getByTestId("vertical-select")).toHaveValue("health");
   });
 
   it("a first visit is not 'forgotten' even though the server just created the workspace", async () => {

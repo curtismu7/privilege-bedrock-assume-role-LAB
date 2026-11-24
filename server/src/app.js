@@ -89,10 +89,14 @@ export function createApp({
     next();
   });
   // The workspace of a request (rule 13): a bad X-Workspace is a 400 with a message, never silently the default.
-  // Every route that uses a workspace answers X-Workspace-Fresh: 1 when this request created it (0 otherwise): a tab that already used this id and gets 1 was forgotten.
+  // Every route that uses a workspace answers X-Workspace-Fresh: 1 when this request created it (0 otherwise). When it created it for a tab that SAYS it has used
+  // this id before (X-Workspace-Seen: 1, set by the page when it sent the request), the workspace was forgotten (evicted at the cap, or lost to a restart):
+  // X-Workspace-Forgotten: 1. The decision is made here from the request, never from the order responses arrive in. Routes validate their input BEFORE calling this,
+  // so a refused request creates and evicts nothing.
   const wsOf = (req, res) => {
     const { ws, created } = workspaces.touch(workspaceFrom(req));
     res.set('X-Workspace-Fresh', created ? '1' : '0');
+    if (created && req.headers['x-workspace-seen'] === '1') res.set('X-Workspace-Forgotten', '1');
     return ws;
   };
 
@@ -128,6 +132,7 @@ export function createApp({
   // Replace the live key (a fresh ledger and no session; the clock and the audit log are kept). The credential of a stored key is write-only: it is
   // never in the answer. createKeyObject throws a 4xx before anything changes.
   api.put('/key', (req, res) => {
+    createKeyObject(req.body, createClock(0)); // validate FIRST (a 4xx here creates and evicts no workspace)
     const { lab } = wsOf(req, res);
     lab.setKey(req.body);
     res.json(lab.view());
@@ -145,15 +150,16 @@ export function createApp({
   // A call through the live key. Optional `key` replaces the key (fresh ledger and no session), `aws` replaces the named policies,
   // `advanceMs` moves the lab clock forward first. Everything is validated before anything changes.
   api.post('/call', (req, res) => {
-    const ws = wsOf(req, res);
-    const { lab } = ws;
     onlyKeys(req.body, ['prompt', 'advanceMs', 'key', 'aws', 'providerState'], 'the call request');
     const { prompt, key, aws } = req.body;
     validatePrompt(prompt);
     const advanceMs = validateAdvance(req.body.advanceMs);
     const providerState = validateProviderState(req.body.providerState);
     if (aws !== undefined) validateAws(aws);
-    if (key !== undefined) lab.setKey(key); // createKeyObject throws a 4xx before the lab changes
+    if (key !== undefined) createKeyObject(key, createClock(0)); // everything is validated BEFORE the workspace is touched: a refused request creates and evicts nothing
+    const ws = wsOf(req, res);
+    const { lab } = ws;
+    if (key !== undefined) lab.setKey(key);
     if (aws !== undefined) lab.setAws({ ...lab.aws(), ...aws });
     if (advanceMs) lab.advance(advanceMs);
     const result = lab.call(prompt, { providerState });
@@ -184,14 +190,14 @@ export function createApp({
 
   api.get('/scenarios', (_req, res) => res.json({ scenarios: SCENARIOS.map(({ id, kind, title, summary, expect }) => ({ id, kind, title, summary, expect })) }));
   api.post('/scenario/:id', (req, res) => {
-    const ws = wsOf(req, res);
     const sc = scenarioById(req.params.id);
     if (!sc) throw refuse('unknown_scenario', 'no scenario with that id', 404);
+    const ws = wsOf(req, res);
     const out = runScenarioDetailed(sc.id);
     const items = itemsFor(sc.kind, out.detail);
     const last = sc.kind === 'call' ? out.result.calls.at(-1) : null;
     const code = sc.kind === 'call' ? last.code : sc.kind === 'vertex' ? out.result.code : sc.kind === 'fallback-target' ? (out.result.ok ? 'success' : 'target_failed') : 'key_shape';
-    const verdict = sc.kind === 'key-shape' || sc.kind === 'fallback-target' ? null : verdictFor(code);
+    const verdict = sc.kind === 'key-shape' || sc.kind === 'fallback-target' ? null : verdictFor(code, sc.kind === 'vertex' ? 'vertex' : 'bedrock');
     const prompt = sc.prompt ?? sc.calls?.[0]?.prompt ?? DEFAULT_PROMPT;
     res.json({ ...out, verdict, ...recordRun(ws, { kind: 'scenario', scenarioId: sc.id, prompt, items, ok: out.pass, code }) });
   });
@@ -224,7 +230,7 @@ export function createApp({
   api.post('/reset', (req, res) => {
     const id = workspaceFrom(req);
     workspaces.reset(id);
-    res.json({ reset: true, workspace: id, ...createLabState().lab.view() }); // the defaults, without taking the workspace's slot again
+    res.json({ reset: true, workspace: id, ...workspaces.get(id).lab.view() }); // starts again from the defaults and keeps its slot: the tab that pressed Reset is live, so its next request is not "forgotten"
   });
 
   api.use((_req, res) => res.status(404).json({ error: 'not_found', message: 'Not found' }));

@@ -13,10 +13,15 @@ const CALL_EXTRA = Object.freeze({
   provider_timeout: { ok: false, stage: 'bedrock-invoke', title: 'Bedrock timed out (504)', message: 'The mock Bedrock did not answer inside the key\'s timeout.', fix: 'Retry, or name a fallback target.' },
 });
 
-const ALL = Object.freeze({ ...VERTEX_RESULTS, ...RESULTS, ...CALL_EXTRA });
+// Two namespaces that share code names (success, bad_input) but say different things: the Bedrock one (evaluator results and the codes the call path adds around
+// them) and the Vertex one (no role is assumed there). They are never merged.
+const BEDROCK = Object.freeze({ ...RESULTS, ...CALL_EXTRA });
+const NAMESPACES = Object.freeze({ bedrock: BEDROCK, vertex: Object.freeze({ ...VERTEX_RESULTS }) });
 
-// -> { code, ok, stage, title, message, fix, labText: true }. An unknown code is named, never blank.
-export function verdictFor(code) {
-  const v = Object.hasOwn(ALL, code) ? ALL[code] : { ok: false, stage: 'unknown', title: 'Unknown result', message: 'The lab returned a result it has no wording for.', fix: null };
-  return { code: Object.hasOwn(ALL, code) ? code : 'unknown', ...v, labText: true };
+// -> { code, ok, stage, title, message, fix, labText: true }. `kind` is 'bedrock' (default: a call or a Bedrock evaluation) or 'vertex'. An unknown code is named, never blank.
+export function verdictFor(code, kind = 'bedrock') {
+  const table = Object.hasOwn(NAMESPACES, kind) ? NAMESPACES[kind] : BEDROCK;
+  const known = Object.hasOwn(table, code);
+  const v = known ? table[code] : { ok: false, stage: 'unknown', title: 'Unknown result', message: 'The lab returned a result it has no wording for.', fix: null };
+  return { code: known ? code : 'unknown', ...v, labText: true };
 }

@@ -1,5 +1,5 @@
 // Workspaces (rule 13). A workspace id (default "default", header X-Workspace) scopes the saved state: the key's chain and ledgers, the lab clock,
-// the last run (for the what-this-run-left-behind panel) and the run log. Reset clears one workspace and gives its slot back.
+// the last run (for the what-this-run-left-behind panel) and the run log. Reset clears one workspace (the API starts it again at once, so the tab that reset it is not told it was forgotten).
 // The number of workspaces is capped (the default workspace is exempt): at the cap the least recently used other workspace is forgotten to admit a new
 // tab, never a refusal (a lab left running for days must not lock a new tab out). Shared by every workspace on purpose: the netguard counters and the mode.
 export const DEFAULT_WORKSPACE = 'default';

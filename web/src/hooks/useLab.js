@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { expectForgetting } from "../workspace";
 import { getInfo, getObservability, getStory, postCall, postReset, postScenario, setMode } from "../api";
 
 const say = (r, what) => r.body?.message || `${what} failed (HTTP ${r.status})`;
-const DEFAULT_VERTICAL = "retail";
+const DEFAULT_VERTICAL = "retail"; // what the picker shows until the server has answered; it is never SENT before a load has succeeded
 
 /**
  * The lab's one data hook. It holds the info (source, realAvailable, the banner, the limits lists), the story and talk track for the picked vertical,
@@ -25,6 +24,10 @@ export default function useLab() {
   const seq = useRef(0);
   // Goes up whenever the visitor starts over (Reset, a new vertical, a mode switch): a run that was already in flight must not write its result into the new view.
   const gen = useRef(0);
+  // True once a load has succeeded. Until then every load asks for NO vertical (the configured customer vertical and its cast words are what must come back),
+  // a Retry included; the picker's default is only ever sent after the server has said which vertical is configured.
+  const loaded = useRef(false);
+  const askFor = () => (loaded.current ? vertical : undefined);
 
   // `v` is the vertical to ask for. The FIRST load passes none, so the configured customer vertical (and its cast overrides) is what comes back;
   // later loads pass the one the visitor has picked.
@@ -34,6 +37,7 @@ export default function useLab() {
     if (mine !== seq.current) return;
     const bad = [i, s].find((r) => !r.ok);
     if (bad) { setError(say(bad, "Loading the lab")); return; }
+    loaded.current = true;
     setError(null); setInfo(i.body); setStory(s.body);
     if (s.body.vertical && s.body.vertical !== v) setVerticalState(s.body.vertical); // the configured vertical wins on the first load
   }, []);
@@ -49,7 +53,7 @@ export default function useLab() {
     if (!r.ok) { setModeError(r.body?.message || `The mode did not change (HTTP ${r.status})`); return { ok: false, message: r.body?.message }; }
     gen.current++;
     setModeError(null); setLast(null); setObs(null); setEpoch((n) => n + 1);
-    await load(vertical);
+    await load(askFor());
     return { ok: true };
   }, [load, vertical, info]);
 
@@ -91,16 +95,16 @@ export default function useLab() {
   }, [refreshObs]);
 
   // The server forgot this tab's workspace (see workspace.js): its lab is at its defaults. Drop what the page shows of the old one and load again.
-  const startOver = useCallback(() => { gen.current++; setLast(null); setObs(null); setEpoch((n) => n + 1); }, []);
+  // It does NOT bump `gen`: the request that revealed it already ran on the NEW workspace, so its result is valid and must still be shown.
+  const startOver = useCallback(() => { setLast(null); setObs(null); setEpoch((n) => n + 1); }, []);
 
   const reset = useCallback(async () => {
     gen.current++;
-    expectForgetting(); // the next request creates the workspace again: that is this Reset, not the server forgetting
     const r = await postReset();
     setLast(null); setObs(null); setDrafts({}); setEpoch((n) => n + 1);
-    await load(vertical);
+    await load(askFor());
     return r.ok;
   }, [load, vertical]);
 
-  return { vertical, setVertical, info, story, source: info?.source || null, error, modeError, last, obs, drafts, setDraft, busy, epoch, reload: () => load(vertical), switchMode, runCall, runScenario, reset, startOver };
+  return { vertical, setVertical, info, story, source: info?.source || null, error, modeError, last, obs, drafts, setDraft, busy, epoch, reload: () => load(askFor()), switchMode, runCall, runScenario, reset, startOver };
 }
