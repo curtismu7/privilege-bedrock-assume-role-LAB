@@ -9,7 +9,7 @@ import { installNetguard } from './netguard.js';
 import { SCENARIOS, runScenario } from './scenarios.js';
 import { BANNER, RELEASE_NOTES_DATE, UNVERIFIED } from './data.js';
 import { STORIES, scanStories } from './stories.js';
-import { loadTalkTrack } from './talkTrack.js';
+import { TALK_SECTIONS } from './talkTrack.js';
 import { DIAGRAM_NAMES, diagramProblems, rawDiagram } from './diagramData.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -60,8 +60,8 @@ export function runChecks({ env = process.env } = {}) {
   else add('kit-pin', pin.length ? 'fail' : 'pass', pin.length ? `vendored kit file(s) differ from the pin: ${pin.join(', ')}` : 'the vendored model-gateway-sim files match the pin');
 
   // Stories are data with {{cast}} tokens (rule 10): every token is defined by all three vertical packs, every story names a real scenario and has a talk-track section.
-  const scan = scanStories(STORIES, undefined, Object.fromEntries(loadTalkTrack().map((t) => [`talk-track ${t.id}`, t])));
-  const sectionIds = new Set(loadTalkTrack().map((t) => t.id));
+  const scan = scanStories(STORIES, undefined, Object.fromEntries(TALK_SECTIONS.map((t) => [`talk-track ${t.id}`, t])));
+  const sectionIds = new Set(TALK_SECTIONS.map((t) => t.id));
   const lonely = STORIES.filter((st) => !SCENARIOS.some((sc) => sc.id === st.scenario) || !sectionIds.has(st.id)).map((st) => st.id);
   const storyBad = [...scan.missing, ...lonely.map((id) => `${id}: no scenario or no talk-track section`)];
   add('stories', storyBad.length === 0 ? 'pass' : 'fail', storyBad.length === 0 ? `${scan.stories} stories and the talk track use only tokens every vertical pack defines (${scan.tokens.length} tokens)` : storyBad.slice(0, 3).join('; '));

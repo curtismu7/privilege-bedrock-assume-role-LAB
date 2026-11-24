@@ -35,6 +35,12 @@ export function createWorkspaces({ build, max = MAX_WORKSPACES }) {
       all.set(id, ws);
       return ws;
     },
+    // Same as get, and says whether THIS call created the workspace (a new tab, or one that was forgotten: evicted at the cap, reset, or lost to a restart).
+    // The page uses it to tell a visitor who already used this workspace that the lab was reset under them.
+    touch(id = DEFAULT_WORKSPACE) {
+      const existed = all.has(id);
+      return { ws: this.get(id), created: !existed };
+    },
     peek: (id = DEFAULT_WORKSPACE) => all.get(id) ?? null,
     ids: () => [...all.keys()],
     // Reset forgets the workspace; it starts fresh on its next use and its slot is free again.

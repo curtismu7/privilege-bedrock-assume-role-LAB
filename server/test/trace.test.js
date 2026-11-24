@@ -82,3 +82,19 @@ test('the role-service step says whether the key sent an external ID: sent (valu
   assert.equal(stsBody('external-id-mismatch').ExternalId, 'sent by the key (value not shown)');
   assert.doesNotMatch(JSON.stringify(exchangesOf(SCENARIOS.find((s) => s.id === 'external-id-mismatch')).ex), /example-external-id-000\d/);
 });
+
+test('trace labels: runs with several calls say "Call n of m" (as the hop strip does); only the key-shape scenario names the key; the Vertex invalid-policy step does not say the policy was read', async () => {
+  const titles = (id) => exchangesOf(SCENARIOS.find((s) => s.id === id)).ex.map((e) => e.title);
+  assert.deepEqual(titles('expired-session-refreshed').filter((t) => /App to gateway/.test(t)).map((t) => t.split(':')[0]), ['Call 1 of 2', 'Call 2 of 2']);
+  assert.ok(titles('stored-vs-assumed-key-shape').some((t) => /^Stored-credential key: App to gateway/.test(t)) && titles('stored-vs-assumed-key-shape').some((t) => /^Assumed-role key: App to gateway/.test(t)));
+  assert.ok(!titles('assumed-role-as-fallback-target').some((t) => /^Call \d of/.test(t)), 'one call in that run: no "Call n of m"');
+  assert.ok(!titles('success').some((t) => /^Call \d of/.test(t)));
+  const lab = await startLab();
+  try {
+    const bad = (await lab.send('POST', '/api/evaluate', { target: 'vertex', policy: '{bad' })).json;
+    assert.equal(bad.code, 'vertex_policy_invalid');
+    const ex = exchangesFor([{ type: 'vertex', evaluation: { ...bad, steps: [] } }], { prompt: 'x' });
+    const d = ex[0].trace.decisions[0];
+    assert.equal(d.outcome, 'fail'); assert.match(d.label, /could not be read/); assert.doesNotMatch(d.label, /was read/);
+  } finally { await lab.close(); }
+});

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STORIES, scanStories, buildStories } from '../src/stories.js';
 import { VERTICALS, CAST_KEYS, tokensIn, unfilled, castFor } from '../src/cast.js';
-import { loadTalkTrack, buildTalkTrack } from '../src/talkTrack.js';
+import { loadTalkTrack, buildTalkTrack, parseTalkTrack, TALK_SECTIONS } from '../src/talkTrack.js';
 import { validateConfig, castForVertical, loadCustomerConfig, publicConfig } from '../src/customer.js';
 import { SCENARIOS, runScenario } from '../src/scenarios.js';
 import { startLab } from './helpers.js';
@@ -97,4 +97,13 @@ test('a missing talk track is logged, never silent; GET /api/story names the pro
     assert.equal(j.talkTrackProblem, null); assert.ok(j.talkTrack.length > 10);
     assert.ok(j.warnings.length >= 2, j.warnings.join('; '));
   } finally { await lab.close(); }
+});
+
+test('talk-track paragraphs: a paragraph starts at a blank line, hard-wrapped lines join with a space; the sections are read once at load', () => {
+  const [a, b] = parseTalkTrack('## One\n\nfirst line\nsecond line\n\nthird\n\n## S01: Two\nsolo\n');
+  assert.deepEqual(a.paragraphs, ['first line second line', 'third']);
+  assert.equal(a.say, 'first line second line\n\nthird');
+  assert.deepEqual([b.id, b.title, b.paragraphs], ['S01', 'Two', ['solo']]);
+  assert.ok(TALK_SECTIONS.length > 10 && Object.isFrozen(TALK_SECTIONS));
+  assert.equal(buildTalkTrack({ castBrand: 'X', castApp: 'a', castTask: 't', castKey: 'k', castOwner: 'o' }).length, TALK_SECTIONS.length);
 });

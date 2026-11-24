@@ -110,3 +110,32 @@ describe("Stories page: a missing talk track is named", () => {
     expect(await screen.findByTestId("talk-problem")).toHaveTextContent(/no talk track to show/);
   });
 });
+
+describe("Diagram page: the keyboard", () => {
+  it("a box's name is a real button: Enter opens its details, the details' own buttons work from the keyboard (Copy link, Close), and no role=button wraps interactive content", async () => {
+    const user = await h.mount({ page: "diagram" });
+    await screen.findByTestId("pattern-canvas");
+    const name = await screen.findByTestId("pat-name-gw");
+    expect(name.tagName).toBe("BUTTON");
+    expect(name).toHaveAttribute("aria-expanded", "false");
+    name.focus();
+    await user.keyboard("{Enter}");
+    const passport = await screen.findByTestId("dk-passport-gw");
+    expect(name).toHaveAttribute("aria-expanded", "true");
+    expect(document.querySelectorAll("[role='button'] button, [role='button'] a, [role='button'] input")).toHaveLength(0);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: () => Promise.resolve() } });
+    const copy = within(passport).getByTestId("dk-passport-copy");
+    copy.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(passport).toHaveTextContent(/Copied/i));
+    expect(screen.getByTestId("dk-passport-gw")).toBeInTheDocument(); // the Enter on Copy did not toggle the box
+    const close = within(passport).getByTestId("dk-passport-close");
+    close.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByTestId("dk-passport-gw")).toBeNull());
+    expect(name).toHaveAttribute("aria-expanded", "false");
+    name.focus();
+    await user.keyboard(" ");
+    await screen.findByTestId("dk-passport-gw");
+  });
+});

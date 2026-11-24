@@ -55,3 +55,28 @@ test('a malformed X-Workspace is a 400 with a message, never silently the defaul
     assert.equal((await lab.send('POST', '/api/reset', {}, { 'x-workspace': 'w5' })).status, 200);
   } finally { await lab.close(); }
 });
+
+test('X-Workspace-Fresh: 1 on the request that CREATES a workspace (a new tab, or one forgotten at the cap or by a reset), 0 after; routes with no workspace carry none', async () => {
+  const lab = await startLab();
+  try {
+    const w = (id) => ({ 'x-workspace': id });
+    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '1');
+    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '0');
+    assert.equal((await lab.get('/api/info', w('tab-a'))).headers.get('x-workspace-fresh'), null);
+    assert.equal((await lab.get('/api/state')).headers.get('x-workspace-fresh'), '1', 'the default workspace is created on first use too');
+    await lab.send('POST', '/api/reset', {}, w('tab-a'));
+    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '1', 'forgotten by a reset: created again');
+    // evicted at the cap: tab-a is the least recently used of 20 others, a 21st tab pushes it out
+    for (let i = 0; i < MAX_WORKSPACES; i++) await lab.get('/api/state', w(`other-${i}`));
+    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '1', 'evicted at the cap: created again, with its defaults');
+    assert.equal((await lab.get('/api/state', w('tab-a'))).headers.get('x-workspace-fresh'), '0');
+  } finally { await lab.close(); }
+});
+
+test('least RECENTLY USED order: using a workspace keeps it, the one not used for longest is the one forgotten', () => {
+  const ws = createWorkspaces({ build: (id) => ({ id }), max: 2 });
+  ws.get('a'); ws.get('b'); ws.get('a'); ws.get('c');
+  assert.deepEqual(ws.ids().filter((i) => i !== 'default').sort(), ['a', 'c']);
+  assert.equal(ws.touch('b').created, true);
+  assert.equal(ws.touch('b').created, false);
+});

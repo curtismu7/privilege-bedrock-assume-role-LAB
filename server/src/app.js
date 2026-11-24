@@ -26,7 +26,7 @@ import { verdictFor } from './verdicts.js';
 import { createWorkspaces, workspaceFrom, WorkspaceError } from './workspaces.js';
 import { castForVertical, loadCustomerConfig, publicConfig } from './customer.js';
 import { buildStories } from './stories.js';
-import { buildTalkTrack, loadTalkTrack } from './talkTrack.js';
+import { TALK_SECTIONS, buildTalkTrack } from './talkTrack.js';
 import { DIAGRAM_NAMES, buildDiagram, hasDiagram } from './diagramData.js';
 import { MAX_RUNS, STREAMS, buildRunRecord, decisionLine, durationMs, eventsFor, itemsFor } from './runObs.js';
 import { exchangesFor } from './runTrace.js';
@@ -84,12 +84,17 @@ export function createApp({
   // Wrong method on a known path: 405 with Allow.
   api.use((req, res, next) => {
     for (const [re, methods] of ROUTE_TABLE) {
-      if (re.test(`/api${req.path}`) && !methods.includes(req.method)) return res.set('Allow', methods.join(', ')).status(405).json({ error: 'method_not_allowed', message: `Use ${methods.join(' or ')} here` });
+      if (re.test(`/api${req.path}`) && !methods.includes(req.method) && !(req.method === 'HEAD' && methods.includes('GET'))) return res.set('Allow', [...methods, ...(methods.includes('GET') ? ['HEAD'] : [])].join(', ')).status(405).json({ error: 'method_not_allowed', message: `Use ${methods.join(' or ')} here` });
     }
     next();
   });
   // The workspace of a request (rule 13): a bad X-Workspace is a 400 with a message, never silently the default.
-  const wsOf = (req) => workspaces.get(workspaceFrom(req));
+  // Every route that uses a workspace answers X-Workspace-Fresh: 1 when this request created it (0 otherwise): a tab that already used this id and gets 1 was forgotten.
+  const wsOf = (req, res) => {
+    const { ws, created } = workspaces.touch(workspaceFrom(req));
+    res.set('X-Workspace-Fresh', created ? '1' : '0');
+    return ws;
+  };
 
   // Every run, live or scenario, leaves the same things behind: one stdout line per decision, the last-run record for the panel and a log line.
   function recordRun(ws, { kind, scenarioId = null, prompt, items, ok, code }) {
@@ -118,12 +123,12 @@ export function createApp({
     throw refuse('bad_source', 'source must be "mock" or "real"');
   });
 
-  api.get('/state', (req, res) => res.json(wsOf(req).lab.view()));
+  api.get('/state', (req, res) => res.json(wsOf(req, res).lab.view()));
 
   // Replace the live key (a fresh ledger and no session; the clock and the audit log are kept). The credential of a stored key is write-only: it is
   // never in the answer. createKeyObject throws a 4xx before anything changes.
   api.put('/key', (req, res) => {
-    const { lab } = wsOf(req);
+    const { lab } = wsOf(req, res);
     lab.setKey(req.body);
     res.json(lab.view());
   });
@@ -140,7 +145,7 @@ export function createApp({
   // A call through the live key. Optional `key` replaces the key (fresh ledger and no session), `aws` replaces the named policies,
   // `advanceMs` moves the lab clock forward first. Everything is validated before anything changes.
   api.post('/call', (req, res) => {
-    const ws = wsOf(req);
+    const ws = wsOf(req, res);
     const { lab } = ws;
     onlyKeys(req.body, ['prompt', 'advanceMs', 'key', 'aws', 'providerState'], 'the call request');
     const { prompt, key, aws } = req.body;
@@ -179,7 +184,7 @@ export function createApp({
 
   api.get('/scenarios', (_req, res) => res.json({ scenarios: SCENARIOS.map(({ id, kind, title, summary, expect }) => ({ id, kind, title, summary, expect })) }));
   api.post('/scenario/:id', (req, res) => {
-    const ws = wsOf(req);
+    const ws = wsOf(req, res);
     const sc = scenarioById(req.params.id);
     if (!sc) throw refuse('unknown_scenario', 'no scenario with that id', 404);
     const out = runScenarioDetailed(sc.id);
@@ -195,7 +200,7 @@ export function createApp({
   api.get('/story', (req, res) => {
     const pick = castForVertical(customer, req.query.vertical);
     if (!pick) throw refuse('unknown_vertical', 'no such vertical', 400);
-    const sections = loadTalkTrack();
+    const sections = TALK_SECTIONS;
     res.json({ ...publicConfig(customer), vertical: pick.vertical, cast: pick.cast, talkTrackProblem: sections.length === 0 ? 'docs/talk-track.md is missing or empty, so there is no talk track to show' : null, stories: buildStories(pick.cast).map((st) => ({ ...st, page: scenarioById(st.scenario)?.kind === 'vertex' ? 'vertex' : 'assumed-role' })), talkTrack: buildTalkTrack(pick.cast, sections), banner: BANNER, unverified: UNVERIFIED });
   });
 
@@ -210,10 +215,10 @@ export function createApp({
 
   // Rule 27: what the last run of this workspace left behind. null before any run.
   api.get('/run-observability', async (req, res, next) => {
-    try { const ws = wsOf(req); res.json({ record: await buildRunRecord(ws.lastRun, { clock: now }), run: ws.lastRun ? { id: ws.lastRun.id, kind: ws.lastRun.kind, scenarioId: ws.lastRun.scenarioId } : null, streams: STREAMS }); }
+    try { const ws = wsOf(req, res); res.json({ record: await buildRunRecord(ws.lastRun, { clock: now }), run: ws.lastRun ? { id: ws.lastRun.id, kind: ws.lastRun.kind, scenarioId: ws.lastRun.scenarioId } : null, streams: STREAMS }); }
     catch (e) { next(e); }
   });
-  api.get('/log', (req, res) => res.json({ runs: wsOf(req).log }));
+  api.get('/log', (req, res) => res.json({ runs: wsOf(req, res).log }));
 
   // Reset clears this workspace only (its key, policies, clock, audit log, last run and log) and gives its slot back.
   api.post('/reset', (req, res) => {

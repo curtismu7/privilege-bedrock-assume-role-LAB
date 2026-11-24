@@ -79,11 +79,19 @@ export function callExchanges(c, { prompt, startStep = 1, label = null }) {
   return out;
 }
 
+// More than one call in a run is labelled "Call n of m" (as the hop strip on the page is); only the key-shape scenario, whose two calls go through DIFFERENT key
+// modes, says which key each one used.
 export function exchangesFor(items, { prompt }) {
   const out = [];
+  const calls = items.filter((i) => i.type === 'call');
+  const keyShape = calls.length === 2 && new Set(calls.map((i) => hopOf(i.call, 'key').mode)).size === 2;
+  let n = 0;
   for (const item of items) {
-    if (item.type === 'call') out.push(...callExchanges(item.call, { prompt, startStep: out.length + 1, label: items.length > 1 ? (hopOf(item.call, 'key').mode === 'assumed-role' ? 'Assumed-role key' : 'Stored-credential key') : null }));
-    else if (item.type === 'provider') {
+    if (item.type === 'call') {
+      const label = calls.length < 2 ? null : keyShape ? (hopOf(item.call, 'key').mode === 'assumed-role' ? 'Assumed-role key' : 'Stored-credential key') : `Call ${n + 1} of ${calls.length}`;
+      n++;
+      out.push(...callExchanges(item.call, { prompt, startStep: out.length + 1, label }));
+    } else if (item.type === 'provider') {
       const p = item.primary;
       out.push({
         step: out.length + 1, title: `Gateway to ${p.provider}: could not answer (HTTP ${p.status})`, status: p.status,
@@ -96,7 +104,7 @@ export function exchangesFor(items, { prompt }) {
         trace: mockTrace({
           url: 'https://vertex.lab.example/v1/endpoints/example:predict', authorization: 'The gateway\'s own service account (a lab mock value; no role is assumed)', requestHeaders: { accept: null },
           rpc: { instances: [{ content: prompt }] }, status: e.ok ? 200 : 403, body: e.ok ? { predictions: ['(lab mock answer)'] } : { error: e.code, note: 'Lab model: the real status and wording are UNVERIFIED.' },
-          decisions: (e.steps.length ? e.steps : [{ id: 'policy', ok: e.ok, detail: e.title }]).map((s) => ({ id: s.id, label: s.id === 'binding' ? 'A binding names the service account' : s.id === 'role-grants-predict' ? 'The role grants aiplatform.endpoints.predict' : 'The policy was read', outcome: s.ok ? 'pass' : 'fail', evidence: s.detail })),
+          decisions: (e.steps.length ? e.steps : [{ id: 'policy', ok: e.ok, detail: e.title }]).map((s) => ({ id: s.id, label: s.id === 'binding' ? 'A binding names the service account' : s.id === 'role-grants-predict' ? 'The role grants aiplatform.endpoints.predict' : s.ok ? 'The policy was read' : 'The policy could not be read', outcome: s.ok ? 'pass' : 'fail', evidence: s.detail })),
         }),
       });
     }

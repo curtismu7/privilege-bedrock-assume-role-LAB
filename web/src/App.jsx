@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import TalkTrackDialog from "./talk-track/TalkTrackDialog.jsx";
+import AboutDialog from "./about/AboutDialog.jsx";
 import ModeToggle from "./components/ModeToggle.jsx";
 import PresenterSay from "./components/PresenterSay.jsx";
 import useLab from "./hooks/useLab";
@@ -10,6 +11,7 @@ import DiagramPage from "./pages/DiagramPage.jsx";
 import StoriesPage from "./pages/StoriesPage.jsx";
 import LimitsPage from "./pages/LimitsPage.jsx";
 import { visible } from "./safeText";
+import { WORKSPACE_FORGOTTEN } from "./workspace";
 import { dialogItems } from "./talk";
 
 export const PAGES = [
@@ -49,12 +51,15 @@ export default function App() {
   const [page, setPage] = useState(pageFromHash());
   const [presenter, setPresenter] = useState(false);
   const [talkOpen, setTalkOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [forgotten, setForgotten] = useState(false);
   const [theme, setTheme] = useState(initialTheme);
   const [fontStep, setFontStep] = useState(initialFont);
   const [resetMsg, setResetMsg] = useState("");
 
   useEffect(() => { if (theme === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => { applyFontSize(fontStep); try { localStorage.setItem(FONT_KEY, fontStep); } catch { /* not remembered */ } }, [fontStep]);
+  useEffect(() => { const on = () => { setForgotten(true); lab.startOver(); }; window.addEventListener(WORKSPACE_FORGOTTEN, on); return () => window.removeEventListener(WORKSPACE_FORGOTTEN, on); }, [lab.startOver]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const on = () => setPage(pageFromHash()); window.addEventListener("hashchange", on); return () => window.removeEventListener("hashchange", on); }, []);
   useEffect(() => {
     const on = (e) => {
@@ -73,6 +78,7 @@ export default function App() {
     // The shared TopMenu has no way to disable its Reset button, so while a run is in flight Reset says so instead (a run that finishes after a Reset is dropped anyway).
     if (lab.busy) { setResetMsg("A run is in progress: Reset again when it has finished."); return; }
     clearScenarioHash();
+    setForgotten(false);
     const ok = await lab.reset();
     setResetMsg(ok ? "Reset: the key is back to the default assumed-role key with its default policies, the lab clock is at zero, the audit log and the last run are cleared and the diagram is back in place." : "Reset failed on the server; the view was reloaded.");
   };
@@ -102,12 +108,19 @@ export default function App() {
           talkTrack={{ active: talkOpen, onToggle: () => setTalkOpen((v) => !v) }}
           help={{ href: "https://github.com/curtismu7/privilege-bedrock-assume-role-LAB#readme" }}
           version={info?.version ? `v${info.version}` : null}
+          onVersion={() => setAboutOpen((v) => !v)}
           onReset={reset}
           extra={<ModeToggle source={source || "mock"} info={info} onSwitch={(s) => { if (s !== source) clearScenarioHash(); return lab.switchMode(s); }} />}
         />
       </header>
       <main className="page">
         <p className="banner" role="note" data-state={source === "real" ? "live" : "mock"} data-testid="banner">{banner}</p>
+        {forgotten && (
+          <div className="field-error" role="alert" data-testid="workspace-forgotten">
+            <p>The server forgot this workspace; the lab was reset to its defaults (its key, policies, clock, audit log and last run are back at their start). Your drafts are kept.</p>
+            <button type="button" onClick={() => setForgotten(false)} data-testid="workspace-forgotten-dismiss">Dismiss</button>
+          </div>
+        )}
         {lab.modeError && <p className="field-error" role="alert" data-testid="mode-error-banner">{lab.modeError}</p>}
         {lab.error && (
           <div className="field-error" role="alert" data-testid="load-error">
@@ -122,6 +135,7 @@ export default function App() {
           {lab.error && !story ? null : !story || !info ? <p className="muted" role="status">Loading...</p> : <View key={`${page}-${lab.epoch}`} lab={lab} />}
         </div>
       </main>
+      <AboutDialog isOpen={aboutOpen} onClose={() => setAboutOpen(false)} info={info} version={info?.version ? `v${info.version}` : ""} />
       <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={dialogItems(story?.talkTrack ?? [])} />
     </div>
   );

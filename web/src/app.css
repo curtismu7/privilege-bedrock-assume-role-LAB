@@ -212,3 +212,7 @@ textarea[data-testid$="-text"], textarea[data-testid="vertex-policy"] { font-fam
 /* The shared run-behind table is fixed-layout with percentage columns and only becomes cards below 760px of viewport: at 1280px in a column it is too narrow for the
    ALLOWED chip, so it gets a floor width and scrolls inside its own panel when the column is narrower (layout only; the panel's own styles are vendored). */
 @media (min-width: 761px) { .ro { overflow-x: auto; } .ro-table { min-width: 720px; } .ro-table th:nth-child(4) { width: 12%; } }
+/* The box's name is a real button; it looks like the box's label, and its focus ring is the shared one. */
+.pat-node__name { display: block; width: 100%; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+.pat-node__name:focus-visible { outline: 2px solid var(--on-box); outline-offset: 4px; border-radius: 4px; }
+.pat-node.dk-open .pat-node__name { font-weight: 700; margin-bottom: 6px; }

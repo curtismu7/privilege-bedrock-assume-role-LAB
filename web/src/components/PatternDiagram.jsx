@@ -15,17 +15,17 @@ const narrow = () => typeof window !== "undefined" && typeof window.matchMedia =
 const HANDLES = [["t", Position.Top], ["b", Position.Bottom], ["l", Position.Left], ["r", Position.Right]];
 
 function Box({ data }) {
-  // Keyboard: the box is a button (Tab to it, Enter or Space opens and closes its details). Moving a box is by mouse or touch only.
-  const key = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); data.toggle?.(); } };
+  // Keyboard: the box's NAME is a real button (Tab to it; Enter or Space, which a button turns into a click, opens and closes its details). The expanded details
+  // (buttons, links) are its siblings, not its children, so a wrapper never swallows their keys and no role=button holds interactive content. Moving a box is by mouse or touch only.
   return (
-    <div className={`pat-node${data.passport ? " dk-open" : ""}`} data-kind={data.kind} data-on={data.on ? "true" : "false"} data-testid={`pat-node-${data.id}`} role="button" tabIndex={0} aria-expanded={!!data.passport} aria-label={`${data.label}: show details`} onKeyDown={key}>
+    <div className={`pat-node${data.passport ? " dk-open" : ""}`} data-kind={data.kind} data-on={data.on ? "true" : "false"} data-testid={`pat-node-${data.id}`}>
       {HANDLES.map(([k, pos]) => (
         <span key={k}>
           <Handle id={`s-${k}`} type="source" position={pos} className="pat-handle" />
           <Handle id={`t-${k}`} type="target" position={pos} className="pat-handle" />
         </span>
       ))}
-      {data.label}
+      <button type="button" className="pat-node__name" aria-expanded={!!data.passport} aria-label={`${data.label}: show details`} data-testid={`pat-name-${data.id}`} onClick={(e) => { e.stopPropagation(); data.toggle?.(); }}>{data.label}</button>
       {data.passport && <Passport p={data.passport} />}
     </div>
   );

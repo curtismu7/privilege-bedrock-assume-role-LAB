@@ -218,3 +218,48 @@ describe("a run in flight, a mode press that changes nothing, a deliberate hash 
     expect(await screen.findByTestId("limits-config-warnings")).toHaveTextContent(/name:/);
   });
 });
+
+describe("the version button, and a workspace the server forgot", () => {
+  it("the version button opens THIS lab's own notes (its sourced claims and the Limits link), never another lab's release notes", async () => {
+    const user = await h.mount();
+    await user.click(screen.getByTestId("version"));
+    const dialog = await screen.findByTestId("about-dialog");
+    expect(dialog).toHaveTextContent("Privilege Bedrock assume-role LAB");
+    expect(dialog).toHaveTextContent(/v0\.1\.0/);
+    const info = await h.lab.json("/api/info");
+    for (const claim of info.sourced) expect(dialog).toHaveTextContent(claim);
+    expect(dialog.querySelector("a[href='#limits']")).toBeTruthy();
+    expect(screen.queryByTestId("release-notes")).toBeNull();
+    for (const other of [/Token Workbench/, /PingFederate/, /PingOne/, /Wrong-token/, /Real mode maturity/]) expect(document.body.textContent).not.toMatch(other);
+  });
+
+  it("a tab that already used its workspace and finds it forgotten gets a plain banner and starts over; its own Reset does not", async () => {
+    const user = await h.mount();
+    await user.click(await screen.findByTestId("scenario-success"));
+    await screen.findByTestId("verdict");
+    expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
+    // the server forgets this tab's workspace (here: a reset from outside the page)
+    await fetch(`${h.lab.base}/api/reset`, { method: "POST", headers: { "x-workspace": h.lab.ws(), "content-type": "application/json" }, body: "{}" });
+    await user.click(screen.getByTestId("scenario-wrong-trust-principal"));
+    const banner = await screen.findByTestId("workspace-forgotten");
+    expect(banner).toHaveTextContent(/The server forgot this workspace; the lab was reset to its defaults/);
+    await screen.findByTestId("result-empty");
+    await user.click(screen.getByTestId("workspace-forgotten-dismiss"));
+    expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
+    // the visitor's own Reset is not "forgotten"
+    await user.click(await screen.findByTestId("scenario-success"));
+    await screen.findByTestId("verdict");
+    await user.click(screen.getByTestId("reset"));
+    await screen.findByTestId("result-empty");
+    await user.click(await screen.findByTestId("call"));
+    await screen.findByTestId("verdict");
+    await screen.findByTestId("ro-table"); // let the call's last request finish: a late response from this test must not reach the next one
+    expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
+  });
+
+  it("a first visit is not 'forgotten' even though the server just created the workspace", async () => {
+    await h.mount();
+    await screen.findByTestId("scenario-success");
+    expect(screen.queryByTestId("workspace-forgotten")).toBeNull();
+  });
+});
