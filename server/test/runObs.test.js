@@ -85,7 +85,7 @@ test('no row and no stdout line holds the prompt, an external ID or a credential
   for (const s of SCENARIOS) {
     const { record, events } = await recordFor(s.id);
     const text = JSON.stringify([record.rows, events.map((e) => decisionLine(e, 'run-1'))]);
-    assert.doesNotMatch(text, /example-external-id-000\d|MOCK-scenario-credential|Summarise the open support cases/, s.id);
+    assert.doesNotMatch(text, /example-external-id-000\d|MOCK-scenario-credential|Summarise the open rebooking cases/, s.id);
   }
 });
 
