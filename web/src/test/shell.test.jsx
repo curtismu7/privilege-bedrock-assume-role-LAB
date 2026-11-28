@@ -5,22 +5,40 @@ import { validateConfig } from "../../../server/src/customer.js";
 import { VERTICALS } from "../../../server/src/cast.js";
 import { jsonResponse } from "./harness.js";
 import { nav, screen, text, useLabHarness, userEvent, waitFor, within } from "./util.jsx";
-import { isPresenterKey } from "../App.jsx";
+import { isPresenterKey, MODE_LINES } from "../App.jsx";
 import { WORKSPACE_ID, WORKSPACE_FORGOTTEN, fillRandom, noteWorkspaceHeaders } from "../workspace.js";
 import { dialogItems } from "../talk.js";
 
 const h = useLabHarness();
 const PAGES = ["Assumed role", "Vertex AI", "Diagram", "Stories and talk track", "Limits (UNVERIFIED)"];
 
-describe("shell: banner, mode toggle, presenter, talk track, reset", () => {
-  it("shows the simulation banner FIRST in the page on every page, with the server's own words", async () => {
+describe("shell: Real-or-mock modal, mode toggle, presenter, talk track, reset", () => {
+  it("opens on a MOCK modal that carries the UNVERIFIED claim label; Got it closes it; no old banner on any page", async () => {
     const user = await h.mount();
+    const modal = screen.getByTestId("mode-modal");
+    expect(modal).toHaveAttribute("data-mode", "mock");
+    expect(modal).toHaveTextContent("MOCK");
+    expect(modal).toHaveTextContent(/nothing leaves this machine/);
+    expect(modal).toHaveTextContent(/2026-11-21 release-notes claims are sourced/);
+    expect(modal).toHaveTextContent(/UNVERIFIED/);
+    expect(MODE_LINES.mock).toMatch(/UNVERIFIED/);
+    await user.click(screen.getByTestId("mode-modal-ok"));
+    expect(screen.queryByTestId("mode-modal")).toBeNull();
     for (const p of PAGES) {
       await nav(user, p);
-      expect(document.querySelector("main").firstElementChild, p).toBe(screen.getByTestId("banner"));
-      expect(text("banner"), p).toBe(BANNER);
-      expect(text("banner")).toMatch(/UNVERIFIED/);
+      expect(screen.queryByTestId("banner"), p).toBeNull();
+      expect(document.querySelector("main > .banner"), p).toBeNull();
+      // The claim label that stays on every page once the modal is dismissed: the Limits tab is named UNVERIFIED in the nav.
+      expect(screen.getByRole("link", { name: "Limits (UNVERIFIED)" }), p).toBeInTheDocument();
     }
+    expect(screen.queryByTestId("mode-modal")).toBeNull();
+  });
+
+  it("the server's banner field is still sent (a server test pins it) but the page no longer draws it", async () => {
+    await h.mount();
+    const info = await h.lab.json("/api/info");
+    expect(info.banner).toBe(BANNER);
+    expect(document.body.textContent).not.toContain(BANNER);
   });
 
   it("shows the mode in the header and a Mock / Real toggle: Mock pressed, Real DISABLED with the plain reason from the server", async () => {
@@ -42,6 +60,7 @@ describe("shell: banner, mode toggle, presenter, talk track, reset", () => {
     await user.click(real);
     await waitFor(() => expect(screen.getByTestId("mode-error-banner")).toHaveTextContent(/not built yet/));
     expect(text("mode")).toBe("Mock");
+    expect(screen.getByTestId("mode-modal")).toHaveAttribute("data-mode", "mock"); // a refused Real never turns the modal to REAL
     expect(h.lab.calls.filter((c) => c.path === "/api/mode" && c.method === "POST").map((c) => c.body)).toEqual([{ source: "real" }]);
   });
 
@@ -49,13 +68,15 @@ describe("shell: banner, mode toggle, presenter, talk track, reset", () => {
     await h.mount({ overrides: { "/api/info": () => jsonResponse(502, { error: "bad_gateway", message: "The lab server did not answer." }) } }).catch(() => {});
     expect(await screen.findByTestId("load-error")).toHaveTextContent(/Could not load the lab/);
     expect(screen.getByTestId("retry")).toBeInTheDocument();
-    expect(screen.getByTestId("banner").textContent.length).toBeGreaterThan(40);
+    expect(screen.getByTestId("mode-modal")).toHaveAttribute("data-mode", "mock"); // never blank, and never claiming more than it knows
+    expect(screen.queryByTestId("banner")).toBeNull();
   });
 
-  it("presenter mode keeps the banner first and shows the talk-track line for the page; P toggles and Escape leaves", async () => {
+  it("presenter mode shows the talk-track line for the page (the modal is not shown again in the same session); P toggles and Escape leaves", async () => {
     const user = await h.mount();
+    await user.click(screen.getByTestId("mode-modal-ok"));
     await user.click(screen.getByTestId("presenter"));
-    expect(document.querySelector("main").firstElementChild).toBe(screen.getByTestId("banner"));
+    expect(screen.queryByTestId("mode-modal")).toBeNull();
     expect(screen.getByTestId("presenter-say")).toHaveTextContent(/The claims taken from the 2026-11-21 release notes/);
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(screen.getByTestId("presenter")).toHaveAttribute("aria-pressed", "false"));
@@ -63,7 +84,7 @@ describe("shell: banner, mode toggle, presenter, talk track, reset", () => {
     expect(screen.getByTestId("presenter")).toHaveAttribute("aria-pressed", "true");
     await nav(user, "Diagram");
     expect(screen.getByTestId("presenter-say")).toHaveTextContent(/Everything is simulated/);
-    expect(screen.getByTestId("banner")).toBeInTheDocument();
+    expect(screen.queryByTestId("banner")).toBeNull();
   });
 
   it("the P shortcut ignores a chord, a held key and focus in a field or on a button; Ctrl+P still belongs to the browser", async () => {
@@ -94,6 +115,7 @@ describe("shell: banner, mode toggle, presenter, talk track, reset", () => {
 
   it("the talk track dialog opens with every section, filled for the vertical, one <p> per paragraph", async () => {
     const user = await h.mount();
+    await user.click(screen.getByTestId("mode-modal-ok")); // the modal is a dialog too: close it so the talk track is the only one
     await user.click(screen.getByTestId("talk-track-toggle"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getAllByText(/AirGuard Airlines/).length).toBeGreaterThan(0);
