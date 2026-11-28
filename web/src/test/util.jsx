@@ -14,13 +14,13 @@ export { screen, waitFor, within, userEvent };
 export function useLabHarness() {
   const ctx = { lab: null };
   beforeEach(() => { try { window.localStorage.clear(); window.sessionStorage.clear(); } catch { /* ignore */ } window.location.hash = ""; setJsonView("raw"); });
-  afterEach(async () => { cleanup(); if (ctx.lab) { await ctx.lab.stop(); ctx.lab = null; } });
+  afterEach(async () => { cleanup(); try { window.sessionStorage.clear(); } catch { /* ignore */ } if (ctx.lab) { await ctx.lab.stop(); ctx.lab = null; } });
   ctx.mount = async ({ page, ...opts } = {}) => {
     ctx.lab = await startLab(opts);
     if (page) window.location.hash = `#${page}`;
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByTestId("banner");
+    await screen.findByTestId("mode");
     await waitFor(() => { if (!document.querySelector("[data-testid='mode']")) throw new Error("not loaded"); });
     return user;
   };

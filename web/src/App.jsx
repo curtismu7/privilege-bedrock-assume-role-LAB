@@ -3,6 +3,7 @@ import TopMenu, { applyFontSize } from "./top-menu/TopMenu.jsx";
 import TalkTrackDialog from "./talk-track/TalkTrackDialog.jsx";
 import AboutDialog from "./about/AboutDialog.jsx";
 import ModeToggle from "./components/ModeToggle.jsx";
+import ModeModal from "./mode-modal/ModeModal.jsx";
 import PresenterSay from "./components/PresenterSay.jsx";
 import useLab from "./hooks/useLab";
 import AssumedRolePage from "./pages/AssumedRolePage.jsx";
@@ -21,8 +22,11 @@ export const PAGES = [
   { id: "stories", label: "Stories and talk track", View: StoriesPage },
   { id: "limits", label: "Limits (UNVERIFIED)", View: LimitsPage },
 ];
-// Shown until the server's own banner has loaded: never blank, and never claiming more than it knows.
-export const BANNER_UNKNOWN = "SIMULATED. Mock gateway, mock IAM, mock Bedrock and Vertex AI and a lab clock; nothing leaves this machine. Everything beyond the 2026-11-21 release-notes claims is this lab's own model and UNVERIFIED.";
+// The Real-or-mock modal (shared mode-modal) replaces the long simulation banner. This lab has no Real (the server says "not built yet" and answers 409),
+// so the mode is fixed at MOCK; the line keeps the claim label the banner carried: only the 2026-11-21 release-notes claims are sourced, the rest is UNVERIFIED.
+export const MODE_LINES = {
+  mock: "Simulated: a mock gateway, IAM evaluator, Bedrock and Vertex AI and a lab clock; nothing leaves this machine. Only the 2026-11-21 release-notes claims are sourced; everything else is this lab's own model and UNVERIFIED.",
+};
 // One line per page above the content.
 const PAGE_INTRO = {
   "assumed-role": "An LLM key that stores no cloud credential reaches Bedrock under an assumed IAM role. Compare the two key objects, edit the trust and permission policies, run a scenario or your own call: the verdict names the result and its fix, then the six hops of the call and what the run left behind.",
@@ -86,7 +90,6 @@ export default function App() {
   };
 
   const { source, story, info } = lab;
-  const banner = info?.banner || BANNER_UNKNOWN;
   const View = PAGES.find((p) => p.id === page).View;
   const sc = lab.last?.scenario && lab.last.page === page ? story?.stories.find((s) => s.scenario === lab.last.scenario.id) : null;
   const say = !story ? [] : page === "vertex" ? story.talkTrack.filter((x) => x.id === (sc ? sc.id : "S11")) : page === "assumed-role" ? story.talkTrack.filter((x) => x.id === (sc ? sc.id : "before-you-start")) : story.talkTrack.filter((x) => (PRESENTER_TALK[page] || []).includes(x.id));
@@ -116,7 +119,6 @@ export default function App() {
         />
       </header>
       <main className="page">
-        <p className="banner" role="note" data-state={source === "real" ? "live" : "mock"} data-testid="banner">{banner}</p>
         {forgotten && (
           <div className="field-error" role="alert" data-testid="workspace-forgotten">
             <p>The server forgot this workspace; the lab was reset to its defaults (its key, policies, clock, audit log and last run are back at their start). Your drafts are kept.</p>
@@ -137,6 +139,7 @@ export default function App() {
           {lab.error && !story ? null : !story || !info ? <p className="muted" role="status">Loading...</p> : <View key={`${page}-${lab.epoch}`} lab={lab} />}
         </div>
       </main>
+      <ModeModal mode="mock" lines={MODE_LINES} storageKey="pba-mode" />
       <AboutDialog isOpen={aboutOpen} onClose={() => setAboutOpen(false)} info={info} version={info?.version ? `v${info.version}` : ""} />
       <TalkTrackDialog isOpen={talkOpen} onClose={() => setTalkOpen(false)} talk={dialogItems(story?.talkTrack ?? [])} />
     </div>

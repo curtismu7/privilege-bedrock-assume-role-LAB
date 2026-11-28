@@ -37,13 +37,13 @@ Malformed, oversized, deeply nested, wide or prototype-keyed policy: a named err
 The console setup fields, the session length, every error and fix text, the order of the checks, the principal the gateway presents, the IAM action and Vertex permission needed, how much of IAM is evaluated, the guard step, whether a refused call is audited, whether an expired session refreshes by itself, the Vertex role model.
 
 ## Step 2 acceptance (web; each is a test, a browser check or both)
-1. Every page shows the simulation banner first, the Mock/Real toggle with Real disabled for the server's plain reason, and the mode in the header; the verdict (named result and fix) comes first in the result.
+1. The page opens on the Real-or-mock modal (MOCK, with the UNVERIFIED claim label), and every page shows the Mock/Real toggle with Real disabled for the server's plain reason, and the mode in the header; the verdict (named result and fix) comes first in the result.
 2. The page shows both key objects side by side: the assumed-role key has no credential field; a stored credential is write-only (never shown, the input is cleared after a save).
 3. All 13 scenarios run from the buttons and each verdict equals the hand-written expectation. The six hops of a call are listed with their state, and GatewayTrace shows them as decisions.
 4. Trust and permission policies are editable data; the size limit is shown; a bad policy is a named result; a bad field is the server's plain 400. The lab-clock control moves the session to its expiry and the next call is `session_refreshed`.
 5. The Vertex tab runs its three scenarios and evaluates an editable policy. IAM snippets use placeholder ids only.
 6. The diagram loads by name (`bedrock-assumed-role`) from diagram-studio data; boxes move, Simulate and speed work, Reset restores the positions.
-7. Stories are data with `{{cast}}` tokens (four vertical packs; a test fails on an undefined token); the talk track is `docs/talk-track.md`; presenter mode keeps the banner. The first load asks for no vertical so the customer's own vertical and cast words arrive. Reset clears the scenario in the address.
+7. Stories are data with `{{cast}}` tokens (four vertical packs; a test fails on an undefined token); the talk track is `docs/talk-track.md`; presenter mode shows the talk-track line (the modal opens once per session). The first load asks for no vertical so the customer's own vertical and cast words arrive. Reset clears the scenario in the address.
 8. "What this run left behind" (rule 27) lists the decisions the run made, all tagged simulated, and one stdout line per decision.
 9. Docker: non-root, read-only, published on 127.0.0.1 only, healthcheck on `/api/health`, `restart: unless-stopped`; the image builds with `docs/talk-track.md` inside it.
 
