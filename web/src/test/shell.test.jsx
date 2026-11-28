@@ -115,6 +115,7 @@ describe("shell: Real-or-mock modal, mode toggle, presenter, talk track, reset",
 
   it("the talk track dialog opens with every section, filled for the vertical, one <p> per paragraph", async () => {
     const user = await h.mount();
+    await user.click(screen.getByTestId("mode-modal-ok")); // the modal is a dialog too: close it so the talk track is the only one
     await user.click(screen.getByTestId("talk-track-toggle"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getAllByText(/AirGuard Airlines/).length).toBeGreaterThan(0);
