@@ -43,7 +43,7 @@ The console setup fields, the session length, every error and fix text, the orde
 4. Trust and permission policies are editable data; the size limit is shown; a bad policy is a named result; a bad field is the server's plain 400. The lab-clock control moves the session to its expiry and the next call is `session_refreshed`.
 5. The Vertex tab runs its three scenarios and evaluates an editable policy. IAM snippets use placeholder ids only.
 6. The diagram loads by name (`bedrock-assumed-role`) from diagram-studio data; boxes move, Simulate and speed work, Reset restores the positions.
-7. Stories are data with `{{cast}}` tokens (three vertical packs; a test fails on an undefined token); the talk track is `docs/talk-track.md`; presenter mode keeps the banner. The first load asks for no vertical so the customer's own vertical and cast words arrive. Reset clears the scenario in the address.
+7. Stories are data with `{{cast}}` tokens (four vertical packs; a test fails on an undefined token); the talk track is `docs/talk-track.md`; presenter mode keeps the banner. The first load asks for no vertical so the customer's own vertical and cast words arrive. Reset clears the scenario in the address.
 8. "What this run left behind" (rule 27) lists the decisions the run made, all tagged simulated, and one stdout line per decision.
 9. Docker: non-root, read-only, published on 127.0.0.1 only, healthcheck on `/api/health`, `restart: unless-stopped`; the image builds with `docs/talk-track.md` inside it.
 

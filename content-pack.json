@@ -142,7 +142,7 @@
     {
       "id": "try-missing-invoke-permission",
       "label": "S05: The role cannot invoke the model",
-      "description": "The trace shows the assume succeeded and the invoke failed. The fix is to allow the invoke on the model for the support platform team's role.",
+      "description": "The trace shows the assume succeeded and the invoke failed. The fix is to allow the invoke on the model for the guest services platform team's role.",
       "group": "try-it",
       "action": {
         "type": "route",
@@ -329,7 +329,7 @@
     {
       "id": "S05",
       "title": "The role cannot invoke the model",
-      "say": "The trace shows the assume succeeded and the invoke failed. The fix is to allow the invoke on the model for the support platform team's role.",
+      "say": "The trace shows the assume succeeded and the invoke failed. The fix is to allow the invoke on the model for the guest services platform team's role.",
       "file": "server/src/data/stories/S05-missing-invoke-permission.json"
     },
     {

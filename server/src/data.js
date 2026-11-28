@@ -45,7 +45,7 @@ export const VERTEX_SERVICE_ACCOUNT = 'gateway-vertex@example-project-0001.iam.e
 export const VERTEX_OTHER_ACCOUNT = 'someone-else@example-project-0001.iam.example';
 export const VERTEX_PROJECT = 'example-project-0001.example';
 
-export const DEFAULT_PROMPT = 'Summarise the open support cases for this week.';
+export const DEFAULT_PROMPT = 'Summarise the open rebooking cases for this week.';
 export const GUARD_BLOCK_MARKER = '[[guard-block]]';
 
 const clone = (o) => JSON.parse(JSON.stringify(o));

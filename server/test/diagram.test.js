@@ -20,7 +20,7 @@ test('the diagram is diagram-studio/1 data, loaded by name, valid under the stud
 });
 
 test('the shape the page reads has one step per arrow, in the data\'s order, with the boxes\' own positions', () => {
-  const d = buildDiagram(castFor('retail'), 'bedrock-assumed-role');
+  const d = buildDiagram(castFor('airlines'), 'bedrock-assumed-role');
   const raw = rawDiagram('bedrock-assumed-role');
   assert.equal(d.steps.length, raw.steps.flatMap((s) => s.edges).length);
   assert.deepEqual(d.nodes.map((n) => [n.id, n.x, n.y]), raw.nodes.map((n) => [n.id, n.x, n.y]));

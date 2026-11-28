@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getInfo, getObservability, getStory, postCall, postReset, postScenario, setMode } from "../api";
 
 const say = (r, what) => r.body?.message || `${what} failed (HTTP ${r.status})`;
-const DEFAULT_VERTICAL = "retail"; // what the picker shows until the server has answered; it is never SENT before a load has succeeded
+const DEFAULT_VERTICAL = "airlines"; // what the picker shows until the server has answered; it is never SENT before a load has succeeded
 
 /**
  * The lab's one data hook. It holds the info (source, realAvailable, the banner, the limits lists), the story and talk track for the picked vertical,

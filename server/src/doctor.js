@@ -59,7 +59,7 @@ export function runChecks({ env = process.env } = {}) {
   if (pin === null) add('kit-pin', 'info', 'no pin file here (a slim image); the pin test checks it in the repo');
   else add('kit-pin', pin.length ? 'fail' : 'pass', pin.length ? `vendored kit file(s) differ from the pin: ${pin.join(', ')}` : 'the vendored model-gateway-sim files match the pin');
 
-  // Stories are data with {{cast}} tokens (rule 10): every token is defined by all three vertical packs, every story names a real scenario and has a talk-track section.
+  // Stories are data with {{cast}} tokens (rule 10): every token is defined by all four vertical packs, every story names a real scenario and has a talk-track section.
   const scan = scanStories(STORIES, undefined, Object.fromEntries(TALK_SECTIONS.map((t) => [`talk-track ${t.id}`, t])));
   const sectionIds = new Set(TALK_SECTIONS.map((t) => t.id));
   const lonely = STORIES.filter((st) => !SCENARIOS.some((sc) => sc.id === st.scenario) || !sectionIds.has(st.id)).map((st) => st.id);
